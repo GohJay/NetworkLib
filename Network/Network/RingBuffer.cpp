@@ -140,7 +140,7 @@ void RingBuffer::MoveRear(int size)
 {
 	int directSize = DirectEnqueueSize();
 	if (directSize >= size)
-		_rear += directSize;
+		_rear += size;
 	else
 		_rear = _buffer - 1 + size - directSize;
 }
@@ -148,7 +148,7 @@ void RingBuffer::MoveFront(int size)
 {
 	int directSize = DirectDequeueSize();
 	if (directSize >= size)
-		_front += directSize;
+		_front += size;
 	else
 		_front = _buffer - 1 + size - directSize;
 }
