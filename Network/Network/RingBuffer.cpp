@@ -64,16 +64,13 @@ int RingBuffer::Enqueue(const char * input, int size)
 		size = freeSize;
 
 	if (directSize >= size)
-	{
 		memmove_s(_rear + 1, directSize, input, size);
-		_rear += size;
-	}
 	else
 	{
 		memmove_s(_rear + 1, directSize, input, directSize);
 		memmove_s(_buffer, size - directSize, input + directSize, size - directSize);
-		_rear = _buffer - 1 + size - directSize;
 	}
+	MoveRear(size);
 	return size;
 }
 int RingBuffer::Dequeue(char * output, int size)
@@ -96,16 +93,13 @@ int RingBuffer::Dequeue(char * output, int size)
 		size = useSize;
 
 	if (directSize >= size)
-	{
 		memmove_s(output, size, _front + 1, size);
-		_front += size;
-	}
 	else
 	{
 		memmove_s(output, size, _front + 1, directSize);
 		memmove_s(output + directSize, size - directSize, _buffer, size - directSize);
-		_front = _buffer - 1 + size - directSize;
 	}
+	MoveFront(size);
 	return size;
 }
 int RingBuffer::Peek(char * output, int size)
@@ -138,7 +132,7 @@ int RingBuffer::Peek(char * output, int size)
 }
 void RingBuffer::MoveRear(int size)
 {
-	int directSize = DirectEnqueueSize();
+	int directSize = _bufferEnd - _rear - 1;
 	if (directSize >= size)
 		_rear += size;
 	else
@@ -146,7 +140,7 @@ void RingBuffer::MoveRear(int size)
 }
 void RingBuffer::MoveFront(int size)
 {
-	int directSize = DirectDequeueSize();
+	int directSize = _bufferEnd - _front - 1;
 	if (directSize >= size)
 		_front += size;
 	else
