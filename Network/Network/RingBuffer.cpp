@@ -3,14 +3,14 @@
 USEJAYNAMESPACE
 RingBuffer::RingBuffer(int bufferSize) : _bufferSize(bufferSize)
 {
-	_buffer = new char[_bufferSize + 1];
+	_buffer = (char*)malloc(_bufferSize + 1);
 	_bufferEnd = _buffer + _bufferSize + 1;
 	_front = _buffer;
 	_rear = _buffer;
 }
 RingBuffer::~RingBuffer()
 {
-	delete[] _buffer;
+	free(_buffer);
 }
 int RingBuffer::GetFreeSize(void)
 {
@@ -150,4 +150,12 @@ void RingBuffer::ClearBuffer(void)
 {
 	_rear = _buffer;
 	_front = _buffer;
+}
+char * RingBuffer::GetFrontBufferPtr(void)
+{
+	return _front + 1;
+}
+char * RingBuffer::GetRearBufferPtr(void)
+{
+	return _rear + 1;
 }
