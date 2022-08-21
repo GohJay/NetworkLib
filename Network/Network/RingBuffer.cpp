@@ -3,8 +3,8 @@
 USEJAYNAMESPACE
 RingBuffer::RingBuffer(int bufferSize) : _bufferSize(bufferSize)
 {
-	_buffer = (char*)malloc(_bufferSize + 1);
-	_bufferEnd = _buffer + _bufferSize + 1;
+	_buffer = (char*)malloc(_bufferSize);
+	_bufferEnd = _buffer + _bufferSize;
 	_front = _buffer;
 	_rear = _buffer;
 }
@@ -14,70 +14,74 @@ RingBuffer::~RingBuffer()
 }
 int RingBuffer::GetFreeSize(void)
 {
-	int diff = _front - _rear;
-	if (diff > 0)
-		return diff - 1;
+	int diff = _front - GetRearBufferPtr();
+	if (diff >= 0)
+		return diff;
 	else
 		return _bufferSize + diff;
 }
 int RingBuffer::GetUseSize(void)
 {
-	int diff = _rear - _front;
+	int diff = GetRearBufferPtr() - GetFrontBufferPtr();
 	if (diff >= 0)
 		return diff;
 	else
-		return _bufferSize + diff + 1;
+		return _bufferSize + diff;
 }
 int RingBuffer::DirectEnqueueSize(void)
 {
-	int diff = _front - _rear;
-	if (diff > 0)
-		return diff - 1;
-	else
-		return _bufferEnd - _rear - 1;
-}
-int RingBuffer::DirectDequeueSize(void)
-{
-	int diff = _rear - _front;
+	char* rear = GetRearBufferPtr();
+	int diff = _front - rear;
 	if (diff >= 0)
 		return diff;
 	else
-		return _bufferEnd - _front - 1;
+		return _bufferEnd - rear;
+}
+int RingBuffer::DirectDequeueSize(void)
+{
+	char* front = GetFrontBufferPtr();
+	int diff = GetRearBufferPtr() - front;
+	if (diff >= 0)
+		return diff;
+	else
+		return _bufferEnd - front;
 }
 int RingBuffer::Enqueue(const char * input, int size)
 {
+	char* rear = GetRearBufferPtr();
 	int freeSize;
 	int directSize;
-	int diff = _front - _rear;
-	if (diff > 0)
+	int diff = _front - rear;
+	if (diff >= 0)
 	{
-		freeSize = diff - 1;
-		directSize = diff - 1;
+		freeSize = diff;
+		directSize = diff;
 	}
 	else
 	{
 		freeSize = _bufferSize + diff;
-		directSize = _bufferEnd - _rear - 1;
+		directSize = _bufferEnd - rear;
 	}
 	
 	if (size > freeSize)
 		size = freeSize;
 
 	if (directSize >= size)
-		memmove_s(_rear + 1, directSize, input, size);
+		memmove(rear, input, size);
 	else
 	{
-		memmove_s(_rear + 1, directSize, input, directSize);
-		memmove_s(_buffer, size - directSize, input + directSize, size - directSize);
+		memmove(rear, input, directSize);
+		memmove(_buffer, input + directSize, size - directSize);
 	}
 	MoveRear(size);
 	return size;
 }
 int RingBuffer::Dequeue(char * output, int size)
 {
+	char* front = GetFrontBufferPtr();
 	int useSize;
 	int directSize;
-	int diff = _rear - _front;
+	int diff = GetRearBufferPtr() - front;
 	if (diff >= 0)
 	{
 		useSize = diff;
@@ -85,28 +89,29 @@ int RingBuffer::Dequeue(char * output, int size)
 	}
 	else
 	{
-		useSize = _bufferSize + diff + 1;
-		directSize = _bufferEnd - _front - 1;
+		useSize = _bufferSize + diff;
+		directSize = _bufferEnd - front;
 	}
 
 	if (size > useSize)
 		size = useSize;
 
 	if (directSize >= size)
-		memmove_s(output, size, _front + 1, size);
+		memmove(output, front, size);
 	else
 	{
-		memmove_s(output, size, _front + 1, directSize);
-		memmove_s(output + directSize, size - directSize, _buffer, size - directSize);
+		memmove(output, front, directSize);
+		memmove(output + directSize, _buffer, size - directSize);
 	}
 	MoveFront(size);
 	return size;
 }
 int RingBuffer::Peek(char * output, int size)
 {
+	char* front = GetFrontBufferPtr();
 	int useSize;
 	int directSize;
-	int diff = _rear - _front;
+	int diff = GetRearBufferPtr() - front;
 	if (diff >= 0)
 	{
 		useSize = diff;
@@ -114,48 +119,40 @@ int RingBuffer::Peek(char * output, int size)
 	}
 	else
 	{
-		useSize = _bufferSize + diff + 1;
-		directSize = _bufferEnd - _front - 1;
+		useSize = _bufferSize + diff;
+		directSize = _bufferEnd - front;
 	}
 	
 	if (size > useSize)
 		size = useSize;
 
 	if (directSize >= size)
-		memmove_s(output, size, _front + 1, size);
+		memmove(output, front, size);
 	else
 	{
-		memmove_s(output, size, _front + 1, directSize);
-		memmove_s(output + directSize, size - directSize, _buffer, size - directSize);
+		memmove(output, front, directSize);
+		memmove(output + directSize, _buffer, size - directSize);
 	}
 	return size;
 }
-void RingBuffer::MoveRear(int size)
-{
-	int directSize = _bufferEnd - _rear - 1;
-	if (directSize >= size)
-		_rear += size;
-	else
-		_rear = _buffer - 1 + size - directSize;
-}
 void RingBuffer::MoveFront(int size)
 {
-	int directSize = _bufferEnd - _front - 1;
-	if (directSize >= size)
-		_front += size;
-	else
-		_front = _buffer - 1 + size - directSize;
+	_front = ((_front + size - _buffer) % _bufferSize) + _buffer;
+}
+void RingBuffer::MoveRear(int size)
+{
+	_rear = ((_rear + size - _buffer) % _bufferSize) + _buffer;
 }
 void RingBuffer::ClearBuffer(void)
 {
-	_rear = _buffer;
 	_front = _buffer;
+	_rear = _buffer;
 }
 char * RingBuffer::GetFrontBufferPtr(void)
 {
-	return _front + 1;
+	return ((_front + 1 - _buffer) % _bufferSize) + _buffer;
 }
 char * RingBuffer::GetRearBufferPtr(void)
 {
-	return _rear + 1;
+	return ((_rear + 1 - _buffer) % _bufferSize) + _buffer;
 }

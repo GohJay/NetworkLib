@@ -137,9 +137,11 @@
     <ClInclude Include="..\..\Common\Base.h" />
     <ClInclude Include="..\..\Common\Crypto.h" />
     <ClInclude Include="..\..\Common\Log.h" />
+    <ClInclude Include="SerializationBuffer.h" />
     <ClInclude Include="RingBuffer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="SerializationBuffer.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -8,8 +8,8 @@ JAYNAMESPACE
 * @brief	Network RingBuffer Class
 * @details	TCP/IP 프로토콜 송수신을 위한 링버퍼 클래스
 * @author   고재현
-* @date		2022-08-15
-* @version  1.0.1
+* @date		2022-08-20
+* @version  1.0.2
 **/
 class RingBuffer
 {
@@ -73,8 +73,8 @@ public:
 	* @param	int(원하는 길이)
 	* @return	void
 	**/
-	void MoveRear(int size);
 	void MoveFront(int size);
+	void MoveRear(int size);
 
 	/**
 	* @brief	버퍼의 모든 데이터 삭제
@@ -102,9 +102,9 @@ public:
 private:
 	char* _buffer;
 	char* _bufferEnd;
-	int _bufferSize;
 	char* _front;
 	char* _rear;
+	int _bufferSize;
 };
 JAYNAMESPACEEND
 

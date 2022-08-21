@@ -1,14 +1,26 @@
 #include "../Network/RingBuffer.h"
+#include "../Network/SerializationBuffer.h"
 #include <iostream>
 #include <thread>
 #pragma comment(lib, "Network.lib")
 
 const char* data = "1234567890 abcdefghijklmnopqrstuvwxyz 1234567890 abcdefghijklmnopqrstuvwxyz 123451234567890 abcdefghijklmnopqrstuvwxyz 1";
 int size = strlen(data);
-Jay::RingBuffer g_RingBuffer(500);
+Jay::RingBuffer g_RingBuffer(200);
 
+void SerializationTest()
+{
+	Jay::SerializationBuffer packet(512);
+	packet.PutData(data, size);
+
+	char buffer[512];
+	packet.GetData(buffer, size);
+	buffer[size] = '\0';
+	std::cout << buffer << std::endl;
+}
 void SingleTest()
 {
+	srand(3);
 	g_RingBuffer.Enqueue(data, size);
 	char buffer1[128];
 	char buffer2[128];
@@ -64,12 +76,15 @@ void DequeueTest()
 
 int main()
 {
+	SerializationTest();
+	return 0;
+
 	//SingleTest();
 	//return 0;
-
-	std::thread enqueue_thread(EnqueueTest);
-	std::thread dequeue_thread(DequeueTest);
-	enqueue_thread.join();
-	dequeue_thread.join();
-    return 0;
+	//
+	//std::thread enqueue_thread(EnqueueTest);
+	//std::thread dequeue_thread(DequeueTest);
+	//enqueue_thread.join();
+	//dequeue_thread.join();
+    //return 0;
 }
