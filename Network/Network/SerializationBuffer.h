@@ -9,7 +9,7 @@ JAYNAMESPACE
 * @details	네트워크 송수신을 위한 직렬화버퍼 클래스
 * @author   고재현
 * @date		2022-08-20
-* @version  1.0.0
+* @version  1.0.1
 **/
 class SerializationBuffer
 {
@@ -90,25 +90,25 @@ public:
 	**/
 	int	GetData(char *output, int size);
 public:
-	SerializationBuffer	&operator = (SerializationBuffer &packet);
+	SerializationBuffer	&operator = (const SerializationBuffer &packet);
 
-	SerializationBuffer	&operator << (char value);
-	SerializationBuffer	&operator << (unsigned char value);
+	SerializationBuffer	&operator << (const char value);
+	SerializationBuffer	&operator << (const unsigned char value);
 
-	SerializationBuffer	&operator << (short value);
-	SerializationBuffer	&operator << (unsigned short value);
+	SerializationBuffer	&operator << (const short value);
+	SerializationBuffer	&operator << (const unsigned short value);
 
-	SerializationBuffer	&operator << (long value);
-	SerializationBuffer	&operator << (unsigned long value);
+	SerializationBuffer	&operator << (const long value);
+	SerializationBuffer	&operator << (const unsigned long value);
 
-	SerializationBuffer	&operator << (long long value);
-	SerializationBuffer	&operator << (unsigned long long value);
+	SerializationBuffer	&operator << (const long long value);
+	SerializationBuffer	&operator << (const unsigned long long value);
 
-	SerializationBuffer	&operator << (int value);
-	SerializationBuffer	&operator << (unsigned int value);
+	SerializationBuffer	&operator << (const int value);
+	SerializationBuffer	&operator << (const unsigned int value);
 
-	SerializationBuffer	&operator << (float value);
-	SerializationBuffer	&operator << (double value);
+	SerializationBuffer	&operator << (const float value);
+	SerializationBuffer	&operator << (const double value);
 
 	SerializationBuffer	&operator >> (char &value);
 	SerializationBuffer	&operator >> (unsigned char &value);

@@ -72,7 +72,7 @@ int SerializationBuffer::GetData(char * output, int size)
 	MoveFront(size);
 	return size;
 }
-SerializationBuffer & SerializationBuffer::operator=(SerializationBuffer & packet)
+SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer & packet)
 {
 	free(_buffer);
 	_bufferSize = packet._bufferSize;
@@ -80,87 +80,87 @@ SerializationBuffer & SerializationBuffer::operator=(SerializationBuffer & packe
 	_bufferEnd = _buffer + _bufferSize;
 	_rear = _buffer + (packet._rear - packet._buffer);
 	_front = _buffer + (packet._front - packet._buffer);
-	memmove(_front, packet._front, packet.GetUseSize());
+	memmove(_front, packet._front, packet._rear - packet._front);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(char value)
+SerializationBuffer & SerializationBuffer::operator<<(const char value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(unsigned char value)
+SerializationBuffer & SerializationBuffer::operator<<(const unsigned char value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(short value)
+SerializationBuffer & SerializationBuffer::operator<<(const short value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(unsigned short value)
+SerializationBuffer & SerializationBuffer::operator<<(const unsigned short value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(long value)
+SerializationBuffer & SerializationBuffer::operator<<(const long value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(unsigned long value)
+SerializationBuffer & SerializationBuffer::operator<<(const unsigned long value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(long long value)
+SerializationBuffer & SerializationBuffer::operator<<(const long long value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(unsigned long long value)
+SerializationBuffer & SerializationBuffer::operator<<(const unsigned long long value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(int value)
+SerializationBuffer & SerializationBuffer::operator<<(const int value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(unsigned int value)
+SerializationBuffer & SerializationBuffer::operator<<(const unsigned int value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(float value)
+SerializationBuffer & SerializationBuffer::operator<<(const float value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
 	MoveRear(size);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(double value)
+SerializationBuffer & SerializationBuffer::operator<<(const double value)
 {
 	int size = sizeof(value);
 	memmove(_rear, (char*)&value, size);
