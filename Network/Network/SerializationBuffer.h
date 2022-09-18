@@ -9,7 +9,7 @@ JAYNAMESPACE
 * @details	네트워크 송수신을 위한 직렬화버퍼 클래스
 * @author   고재현
 * @date		2022-08-20
-* @version  1.0.1
+* @version  1.0.2
 **/
 class SerializationBuffer
 {
@@ -95,6 +95,8 @@ public:
 	SerializationBuffer	&operator << (const char value);
 	SerializationBuffer	&operator << (const unsigned char value);
 
+	SerializationBuffer	&operator << (const wchar_t value);
+
 	SerializationBuffer	&operator << (const short value);
 	SerializationBuffer	&operator << (const unsigned short value);
 
@@ -112,6 +114,8 @@ public:
 
 	SerializationBuffer	&operator >> (char &value);
 	SerializationBuffer	&operator >> (unsigned char &value);
+
+	SerializationBuffer	&operator >> (const wchar_t value);
 
 	SerializationBuffer	&operator >> (short &value);
 	SerializationBuffer	&operator >> (unsigned short &value);

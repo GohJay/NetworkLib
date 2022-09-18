@@ -97,6 +97,13 @@ SerializationBuffer & SerializationBuffer::operator<<(const unsigned char value)
 	MoveRear(size);
 	return *this;
 }
+SerializationBuffer & SerializationBuffer::operator<<(const wchar_t value)
+{
+	int size = sizeof(value);
+	memmove(_rear, (char*)&value, size);
+	MoveRear(size);
+	return *this;
+}
 SerializationBuffer & SerializationBuffer::operator<<(const short value)
 {
 	int size = sizeof(value);
@@ -175,6 +182,13 @@ SerializationBuffer & SerializationBuffer::operator >> (char &value)
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned char &value)
+{
+	int size = sizeof(value);
+	memmove((char*)&value, _front, size);
+	MoveFront(size);
+	return *this;
+}
+SerializationBuffer & SerializationBuffer::operator >> (const wchar_t value)
 {
 	int size = sizeof(value);
 	memmove((char*)&value, _front, size);
