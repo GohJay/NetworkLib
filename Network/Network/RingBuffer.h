@@ -8,8 +8,8 @@ JAYNAMESPACE
 * @brief	Network RingBuffer Class
 * @details	TCP/IP 프로토콜 송수신을 위한 링버퍼 클래스
 * @author   고재현
-* @date		2022-08-20
-* @version  1.0.2
+* @date		2022-11-10
+* @version  1.0.3
 **/
 class RingBuffer
 {
@@ -99,6 +99,14 @@ public:
 	* @return	char*(버퍼 포인터)
 	**/
 	char* GetRearBufferPtr(void);
+
+	/**
+	* @brief	버퍼의 시작 포인터 얻음
+	* @details
+	* @param	void
+	* @return	char*(버퍼 포인터)
+	**/
+	char* GetBufferPtr(void);
 private:
 	char* _buffer;
 	char* _bufferEnd;

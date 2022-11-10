@@ -156,3 +156,7 @@ char * RingBuffer::GetRearBufferPtr(void)
 {
 	return ((_rear + 1 - _buffer) % _bufferSize) + _buffer;
 }
+char * RingBuffer::GetBufferPtr(void)
+{
+	return _buffer;
+}
