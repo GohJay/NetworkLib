@@ -139,17 +139,19 @@ LanServer::SESSION* LanServer::CreateSession(SOCKET socket, wchar_t* ipaddress, 
 }
 void LanServer::DisconnectSession(SESSION* session)
 {
+	DWORD64 sessionID = session->sessionID;
+	WORD index = sessionID & SESSIONID_INDEX_MASK;
+
 	AcquireSRWLockExclusive(&session->lock);
-	OnClientLeave(session->sessionID);
 	session->sessionID |= SESSIONID_INVALIDBIT_MASK;
 	ReleaseSRWLockExclusive(&session->lock);
 	closesocket(session->socket);
 
-	WORD index = session->sessionID & SESSIONID_INDEX_MASK;
 	AcquireSRWLockExclusive(&_indexLock);
 	_indexStack.push(index);
 	ReleaseSRWLockExclusive(&_indexLock);
 
+	OnClientLeave(sessionID);
 	InterlockedDecrement16((SHORT*)&_sessionCnt);
 }
 void LanServer::RecvPost(SESSION* session)
@@ -447,7 +449,7 @@ bool LanServer::Initial()
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
 	_sessionArray = new SESSION[_sessionMax];
 
-	for (int idx = _sessionMax; idx >= 0; idx--)
+	for (int idx = _sessionMax - 1; idx >= 0; idx--)
 		_indexStack.push(idx);
 
 	return true;
@@ -534,15 +536,16 @@ unsigned int LanServer::AcceptThread()
 		}
 
 		//--------------------------------------------------------------------
-		// 신규 접속자의 세션을 만들고 컨텐츠 부에 알림
+		// 신규 접속자의 세션을 만들고 IOCP 에 등록
 		//--------------------------------------------------------------------
 		SESSION* session = CreateSession(client, ip, port);
-		OnClientJoin(session->sessionID);
+		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
-		// 신규 접속자의 세션을 IOCP 에 등록
+		// 신규 접속자의 정보를 컨텐츠 부에 알림
 		//--------------------------------------------------------------------
-		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
+		OnClientJoin(session->sessionID);
+
 		RecvPost(session);
 		InterlockedIncrement(&_monitoring.curTPS.accept);
 	}

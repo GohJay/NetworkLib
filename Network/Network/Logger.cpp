@@ -16,7 +16,7 @@ Logger::Logger()
 Logger::~Logger()
 {
 }
-void Jay::Logger::SetLogLevel(int logLevel)
+void Logger::SetLogLevel(int logLevel)
 {
 	_logLevel = logLevel;
 }
