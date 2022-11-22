@@ -1,6 +1,6 @@
 #ifndef __SERIALIZATIONBUFFER__H_
 #define __SERIALIZATIONBUFFER__H_
-#include "../../Common/Base.h"
+#include "Base.h"
 
 JAYNAMESPACE
 /**
@@ -8,8 +8,8 @@ JAYNAMESPACE
 * @brief	Network SerializationBuffer Class
 * @details	네트워크 송수신을 위한 직렬화버퍼 클래스
 * @author   고재현
-* @date		2022-08-20
-* @version  1.0.2
+* @date		2022-11-22
+* @version  1.0.3
 **/
 class SerializationBuffer
 {
@@ -72,7 +72,7 @@ public:
 	* @param	void
 	* @return	char*(버퍼 포인터)
 	**/
-	char *GetBufferPtr(void);
+	char* GetBufferPtr(void);
 
 	/**
 	* @brief	데이터 입력
@@ -80,7 +80,7 @@ public:
 	* @param	const char*(데이터 포인터), int(크기)
 	* @return	int(입력된 데이터 크기)
 	**/
-	int	PutData(const char *input, int size);
+	int	PutData(const char* input, int size);
 
 	/**
 	* @brief	데이터 출력
@@ -88,49 +88,49 @@ public:
 	* @param	char*(데이터 포인터), int(크기)
 	* @return	int(출력된 데이터 크기)
 	**/
-	int	GetData(char *output, int size);
+	int	GetData(char* output, int size);
 public:
-	SerializationBuffer	&operator = (const SerializationBuffer &packet);
+	SerializationBuffer& operator = (const SerializationBuffer& packet);
 
-	SerializationBuffer	&operator << (const char value);
-	SerializationBuffer	&operator << (const unsigned char value);
+	SerializationBuffer& operator << (const char value);
+	SerializationBuffer& operator << (const unsigned char value);
 
-	SerializationBuffer	&operator << (const wchar_t value);
+	SerializationBuffer& operator << (const wchar_t value);
 
-	SerializationBuffer	&operator << (const short value);
-	SerializationBuffer	&operator << (const unsigned short value);
+	SerializationBuffer& operator << (const short value);
+	SerializationBuffer& operator << (const unsigned short value);
 
-	SerializationBuffer	&operator << (const long value);
-	SerializationBuffer	&operator << (const unsigned long value);
+	SerializationBuffer& operator << (const long value);
+	SerializationBuffer& operator << (const unsigned long value);
 
-	SerializationBuffer	&operator << (const long long value);
-	SerializationBuffer	&operator << (const unsigned long long value);
+	SerializationBuffer& operator << (const long long value);
+	SerializationBuffer& operator << (const unsigned long long value);
 
-	SerializationBuffer	&operator << (const int value);
-	SerializationBuffer	&operator << (const unsigned int value);
+	SerializationBuffer& operator << (const int value);
+	SerializationBuffer& operator << (const unsigned int value);
 
-	SerializationBuffer	&operator << (const float value);
-	SerializationBuffer	&operator << (const double value);
+	SerializationBuffer& operator << (const float value);
+	SerializationBuffer& operator << (const double value);
 
-	SerializationBuffer	&operator >> (char &value);
-	SerializationBuffer	&operator >> (unsigned char &value);
+	SerializationBuffer& operator >> (char& value);
+	SerializationBuffer& operator >> (unsigned char& value);
 
-	SerializationBuffer	&operator >> (const wchar_t value);
+	SerializationBuffer& operator >> (const wchar_t value);
 
-	SerializationBuffer	&operator >> (short &value);
-	SerializationBuffer	&operator >> (unsigned short &value);
+	SerializationBuffer& operator >> (short& value);
+	SerializationBuffer& operator >> (unsigned short& value);
 
-	SerializationBuffer	&operator >> (long &value);
-	SerializationBuffer	&operator >> (unsigned long &value);
+	SerializationBuffer& operator >> (long& value);
+	SerializationBuffer& operator >> (unsigned long& value);
 
-	SerializationBuffer	&operator >> (long long &value);
-	SerializationBuffer	&operator >> (unsigned long long &value);
+	SerializationBuffer& operator >> (long long& value);
+	SerializationBuffer& operator >> (unsigned long long& value);
 
-	SerializationBuffer	&operator >> (int &value);
-	SerializationBuffer	&operator >> (unsigned int &value);
+	SerializationBuffer& operator >> (int& value);
+	SerializationBuffer& operator >> (unsigned int& value);
 
-	SerializationBuffer	&operator >> (float &value);
-	SerializationBuffer	&operator >> (double &value);
+	SerializationBuffer& operator >> (float& value);
+	SerializationBuffer& operator >> (double& value);
 protected:
 	char* _buffer;
 	char* _bufferEnd;

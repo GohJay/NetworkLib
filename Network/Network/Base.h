@@ -23,7 +23,7 @@
 #define closesocket(sock) close(sock)
 #endif //!closesocket
 #ifndef SOCKET
-#define SOCKET unsigned int
+#define SOCKET size_t
 #endif //!SOCKET
 #ifndef SOCKADDR
 #define SOCKADDR struct sockaddr
@@ -37,7 +37,7 @@
 do\
 {\
 	int *ptr = nullptr;\
-	*ptr = 0x96;\
+	*ptr = 0;\
 } while(0)
 #endif //!CRASH
 #ifndef JAYNAMESPACE
