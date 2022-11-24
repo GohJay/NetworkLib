@@ -137,8 +137,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Base.h" />
-    <ClInclude Include="CrashDump.h" />
     <ClInclude Include="define.h" />
+    <ClInclude Include="Error.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Protocol.h" />
@@ -146,7 +146,6 @@
     <ClInclude Include="RingBuffer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CrashDump.cpp" />
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="SerializationBuffer.cpp" />

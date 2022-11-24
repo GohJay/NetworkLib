@@ -1,9 +1,8 @@
 #ifndef __LANSERVER__H_
 #define __LANSERVER__H_
 #include "Base.h"
-#include "Protocol.h"
+#include "define.h"
 #include "SerializationBuffer.h"
-#include "RingBuffer.h"
 #include <stack>
 
 JAYNAMESPACE
@@ -17,36 +16,6 @@ JAYNAMESPACE
 **/
 class LanServer
 {
-private:
-	struct SESSION
-	{
-		SESSION() : sessionID(-1)
-		{
-			InitializeSRWLock(&lock);
-		}
-		OVERLAPPED recvOverlapped;
-		OVERLAPPED sendOverlapped;
-		SRWLOCK lock;
-		DWORD64 sessionID;
-		SOCKET socket;
-		wchar_t ip[16];
-		int port;
-		LONG ioCount;
-		RingBuffer recvQ;
-		RingBuffer sendQ;
-		BOOL sendFlag;
-	};
-	struct TPS
-	{
-		LONG accept;
-		LONG recv;
-		LONG send;
-	};
-	struct MONITORING
-	{
-		TPS oldTPS;
-		TPS curTPS;
-	};
 public:
 	LanServer();
 	~LanServer();
@@ -64,22 +33,22 @@ protected:
 	virtual void OnClientJoin(DWORD64 sessionID) = 0;
 	virtual void OnClientLeave(DWORD64 sessionID) = 0;
 	virtual void OnRecv(DWORD64 sessionID, SerializationBuffer* packet) = 0;
-	virtual void OnError(int error, const wchar_t* fmt, ...) = 0;
+	virtual void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) = 0;
 private:
+	bool Listen(wchar_t* ipaddress, int port, bool nagle);
+	bool Initial();
+	void Release();
 	SESSION* CreateSession(SOCKET socket, wchar_t* ipaddress, int port);
 	void DisconnectSession(SESSION* session);
 	void RecvPost(SESSION* session);
 	void SendPost(SESSION* session);
 	void CompleteRecvPacket(SESSION* session);
-	void SendUnicast(SESSION* session, LAN_PACKET_HEADER* header, SerializationBuffer* packet);
-	void MakeHeader(LAN_PACKET_HEADER* header, SerializationBuffer* packet);
+	void SendUnicast(SESSION* session, SerializationBuffer* header, SerializationBuffer* payload);
+	void MakeHeader(SerializationBuffer* header, SerializationBuffer* payload);
 	SESSION* AcquireSessionLock(DWORD64 sessionID);
 	void ReleaseSessionLock(SESSION* session);
-private:
-	bool Listen(wchar_t* ipaddress, int port, bool nagle);
-	bool Initial();
-	void Release();
 	void MessageProc(UINT message, WPARAM wParam, LPARAM lParam);
+private:
 	unsigned int AcceptThread();
 	unsigned int WorkerThread();
 	unsigned int MonitoringThread();

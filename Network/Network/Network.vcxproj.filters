@@ -33,19 +33,19 @@
     <ClInclude Include="LanServer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CrashDump.h">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="Logger.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="define.h">
+    <ClInclude Include="Error.h">
       <Filter>Base</Filter>
     </ClInclude>
     <ClInclude Include="Protocol.h">
       <Filter>Base</Filter>
     </ClInclude>
     <ClInclude Include="Base.h">
+      <Filter>Base</Filter>
+    </ClInclude>
+    <ClInclude Include="define.h">
       <Filter>Base</Filter>
     </ClInclude>
   </ItemGroup>
@@ -58,9 +58,6 @@
     </ClCompile>
     <ClCompile Include="LanServer.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CrashDump.cpp">
-      <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Util</Filter>
