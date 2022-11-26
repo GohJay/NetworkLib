@@ -48,6 +48,9 @@
     <ClInclude Include="define.h">
       <Filter>Base</Filter>
     </ClInclude>
+    <ClInclude Include="Packet.h">
+      <Filter>Base</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">

@@ -1,12 +1,15 @@
 #include "SerializationBuffer.h"
 
+#define PACKET_HEADER_SIZE	10
+
 USEJAYNAMESPACE
 SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSize)
 {
-	_buffer = (char*)malloc(_bufferSize);
-	_bufferEnd = _buffer + _bufferSize;
-	_front = _buffer;
-	_rear = _buffer;
+	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
+	_bufferEnd = _buffer + _bufferSize + PACKET_HEADER_SIZE;
+	_front = _buffer + PACKET_HEADER_SIZE;
+	_rear = _buffer + PACKET_HEADER_SIZE;
+	_header = _front;
 }
 SerializationBuffer::~SerializationBuffer()
 {
@@ -26,33 +29,23 @@ int SerializationBuffer::GetUseSize(void)
 }
 void SerializationBuffer::Resize(int bufferSize)
 {
-	char* buffer = (char*)malloc(bufferSize);
+	char* buffer = (char*)malloc(bufferSize + PACKET_HEADER_SIZE);
 	char* rear = buffer + (_rear - _buffer);
 	char* front = buffer + (_front - _buffer);
 	memmove(front, _front, GetUseSize());
 	_rear = rear;
 	_front = front;
+	_header = _front;
 	free(_buffer);
 	_buffer = buffer;
-	_bufferEnd = _buffer + bufferSize;
+	_bufferEnd = _buffer + bufferSize + PACKET_HEADER_SIZE;
 	_bufferSize = bufferSize;
-}
-void SerializationBuffer::MoveFront(int size)
-{
-	_front += size;
-}
-void SerializationBuffer::MoveRear(int size)
-{
-	_rear += size;
 }
 void SerializationBuffer::ClearBuffer(void)
 {
-	_front = _buffer;
-	_rear = _buffer;
-}
-char * SerializationBuffer::GetBufferPtr(void)
-{
-	return _buffer;
+	_front = _buffer + PACKET_HEADER_SIZE;
+	_rear = _buffer + PACKET_HEADER_SIZE;
+	_header = _front;
 }
 int SerializationBuffer::PutData(const char * input, int size)
 {
@@ -72,196 +65,204 @@ int SerializationBuffer::GetData(char * output, int size)
 	MoveFront(size);
 	return size;
 }
+int SerializationBuffer::GetPacketSize(void)
+{
+	return _rear - _header;
+}
+void SerializationBuffer::MoveFront(int size)
+{
+	_front += size;
+}
+void SerializationBuffer::MoveRear(int size)
+{
+	_rear += size;
+}
+char* SerializationBuffer::GetFrontBufferPtr(void)
+{
+	return _front;
+}
+char* SerializationBuffer::GetRearBufferPtr(void)
+{
+	return _rear;
+}
+char* SerializationBuffer::GetHeaderPtr(void)
+{
+	return _header;
+}
+int SerializationBuffer::PutHeader(const char* input, int size)
+{
+	int freeSize = _front - _buffer;
+	if (size > freeSize)
+		size = freeSize;
+	_header = _front - size;
+	memmove(_header, input, size);
+	return size;
+}
 SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer & packet)
 {
 	free(_buffer);
 	_bufferSize = packet._bufferSize;
-	_buffer = (char*)malloc(_bufferSize);
-	_bufferEnd = _buffer + _bufferSize;
+	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
+	_bufferEnd = _buffer + _bufferSize + PACKET_HEADER_SIZE;
 	_rear = _buffer + (packet._rear - packet._buffer);
 	_front = _buffer + (packet._front - packet._buffer);
+	_header = _front;
 	memmove(_front, packet._front, packet._rear - packet._front);
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const char value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned char value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const wchar_t value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const short value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned short value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const long value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned long value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const long long value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned long long value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const int value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned int value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const float value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const double value)
 {
-	int size = sizeof(value);
-	memmove(_rear, (char*)&value, size);
-	MoveRear(size);
+	memmove(_rear, (char*)&value, sizeof(value));
+	MoveRear(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (char &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned char &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (const wchar_t value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (short & value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned short &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (long &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned long &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (long long &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned long long &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (int &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned int &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (float &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (double &value)
 {
-	int size = sizeof(value);
-	memmove((char*)&value, _front, size);
-	MoveFront(size);
+	memmove((char*)&value, _front, sizeof(value));
+	MoveFront(sizeof(value));
 	return *this;
 }

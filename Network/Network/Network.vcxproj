@@ -141,6 +141,7 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="Packet.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="SerializationBuffer.h" />
     <ClInclude Include="RingBuffer.h" />

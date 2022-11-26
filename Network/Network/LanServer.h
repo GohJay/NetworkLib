@@ -6,16 +6,16 @@
 #include <stack>
 
 JAYNAMESPACE
-/**
-* @file		LanServer.h
-* @brief	Network LanServer Class
-* @details	내부 네트워크의 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
-* @author   고재현
-* @date		2022-11-22
-* @version  1.0.0
-**/
 class LanServer
 {
+	/**
+	* @file		LanServer.h
+	* @brief	Network LanServer Class
+	* @details	내부 네트워크의 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
+	* @author   고재현
+	* @date		2022-11-22
+	* @version  1.0.0
+	**/
 public:
 	LanServer();
 	~LanServer();
@@ -43,8 +43,7 @@ private:
 	void RecvPost(SESSION* session);
 	void SendPost(SESSION* session);
 	void CompleteRecvPacket(SESSION* session);
-	void SendUnicast(SESSION* session, SerializationBuffer* header, SerializationBuffer* payload);
-	void MakeHeader(SerializationBuffer* header, SerializationBuffer* payload);
+	void SendUnicast(SESSION* session, SerializationBuffer* packet);
 	SESSION* AcquireSessionLock(DWORD64 sessionID);
 	void ReleaseSessionLock(SESSION* session);
 	void MessageProc(UINT message, WPARAM wParam, LPARAM lParam);

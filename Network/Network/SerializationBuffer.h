@@ -3,18 +3,19 @@
 #include "Base.h"
 
 JAYNAMESPACE
-/**
-* @file		SerializationBuffer.h
-* @brief	Network SerializationBuffer Class
-* @details	네트워크 송수신을 위한 직렬화버퍼 클래스
-* @author   고재현
-* @date		2022-11-22
-* @version  1.0.3
-**/
+class LanServer;
 class SerializationBuffer
 {
+	/**
+	* @file		SerializationBuffer.h
+	* @brief	Network SerializationBuffer Class
+	* @details	네트워크 송수신을 위한 직렬화버퍼 클래스
+	* @author   고재현
+	* @date		2022-11-26
+	* @version  1.0.4
+	**/
 public:
-	SerializationBuffer(int bufferSize = 256);
+	SerializationBuffer(int bufferSize = 1024);
 	virtual ~SerializationBuffer();
 public:
 	/**
@@ -50,29 +51,12 @@ public:
 	void Resize(int bufferSize);
 
 	/**
-	* @brief	원하는 길이만큼 읽기위치에서 삭제 / 쓰기위치 이동
-	* @details
-	* @param	int(원하는 길이)
-	* @return	void
-	**/
-	void MoveFront(int size);
-	void MoveRear(int size);
-
-	/**
 	* @brief	버퍼의 모든 데이터 삭제
 	* @details
 	* @param	void
 	* @return	void
 	**/
 	void ClearBuffer(void);
-
-	/**
-	* @brief	버퍼 포인터 얻기
-	* @details
-	* @param	void
-	* @return	char*(버퍼 포인터)
-	**/
-	char* GetBufferPtr(void);
 
 	/**
 	* @brief	데이터 입력
@@ -89,6 +73,55 @@ public:
 	* @return	int(출력된 데이터 크기)
 	**/
 	int	GetData(char* output, int size);
+protected:
+	/**
+	* @brief	패킷 사이즈 얻기
+	* @details
+	* @param	void
+	* @return	int(패킷 사이즈)
+	**/
+	int GetPacketSize(void);
+
+	/**
+	* @brief	원하는 길이만큼 읽기위치에서 삭제 / 쓰기위치 이동
+	* @details
+	* @param	int(원하는 길이)
+	* @return	void
+	**/
+	void MoveFront(int size);
+	void MoveRear(int size);
+
+	/**
+	* @brief	버퍼의 Front 포인터 얻음
+	* @details
+	* @param	void
+	* @return	char*(버퍼 포인터)
+	**/
+	char* GetFrontBufferPtr(void);
+
+	/**
+	* @brief	버퍼의 Rear 포인터 얻음
+	* @details
+	* @param	void
+	* @return	char*(버퍼 포인터)
+	**/
+	char* GetRearBufferPtr(void);
+
+	/**
+	* @brief	버퍼의 Header 포인터 얻음
+	* @details
+	* @param	void
+	* @return	char*(버퍼 포인터)
+	**/
+	char* GetHeaderPtr(void);
+
+	/**
+	* @brief	헤더 입력
+	* @details
+	* @param	const char*(헤더 포인터), int(크기)
+	* @return	int(입력된 헤더 크기)
+	**/
+	int PutHeader(const char* input, int size);
 public:
 	SerializationBuffer& operator = (const SerializationBuffer& packet);
 
@@ -136,7 +169,9 @@ protected:
 	char* _bufferEnd;
 	char* _front;
 	char* _rear;
+	char* _header;
 	int _bufferSize;
+	friend class LanServer;
 };
 JAYNAMESPACEEND
 

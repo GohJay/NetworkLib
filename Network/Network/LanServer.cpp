@@ -1,6 +1,6 @@
 #include "LanServer.h"
-#include "Protocol.h"
 #include "Error.h"
+#include "Packet.h"
 #include "Logger.h"
 #include <process.h>
 #include <synchapi.h>
@@ -90,9 +90,10 @@ bool LanServer::SendPacket(DWORD64 sessionID, SerializationBuffer* packet)
 	if (session == nullptr)
 		return false;
 
-	SerializationBuffer* header = new SerializationBuffer();
-	MakeHeader(header, packet);
-	SendUnicast(session, header, packet);
+	LAN_PACKET_HEADER header;
+	MakeHeader(&header, packet);
+	packet->PutHeader((char*)&header, sizeof(LAN_PACKET_HEADER));
+	SendUnicast(session, packet);
 	SendPost(session);
 	ReleaseSessionLock(session);
 
@@ -360,8 +361,8 @@ void LanServer::SendPost(SESSION* session)
 	WSABUF wsaSendBuf[100];
 	for (int i = 0; i < session->sendBufCount; i++)
 	{
-		wsaSendBuf[i].len = packet[i]->GetUseSize();
-		wsaSendBuf[i].buf = packet[i]->GetBufferPtr();
+		wsaSendBuf[i].len = packet[i]->GetPacketSize();
+		wsaSendBuf[i].buf = packet[i]->GetHeaderPtr();
 	}
 
 	//--------------------------------------------------------------------
@@ -414,6 +415,7 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			break;
 		}
+
 		//--------------------------------------------------------------------
 		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
 		//--------------------------------------------------------------------
@@ -426,7 +428,7 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		// 직렬화 버퍼에 Payload 담기
 		//--------------------------------------------------------------------
 		SerializationBuffer packet;
-		ret = session->recvQ.Dequeue(packet.GetBufferPtr(), header.len);
+		ret = session->recvQ.Dequeue(packet.GetRearBufferPtr(), header.len);
 		if (ret != header.len)
 		{
 			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, header.len, ret);
@@ -443,34 +445,19 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		InterlockedIncrement(&_monitoring.curTPS.recv);
 	}
 }
-void LanServer::SendUnicast(SESSION* session, SerializationBuffer* header, Jay::SerializationBuffer* packet)
+void LanServer::SendUnicast(SESSION* session, SerializationBuffer* packet)
 {
 	//--------------------------------------------------------------------
 	// 송신용 링버퍼에 보낼 직렬화 버퍼의 포인터 담기
 	//--------------------------------------------------------------------
 	int size = sizeof(void*);
-	int ret = session->sendQ.Enqueue((char*)&header, size);
+	int ret = session->sendQ.Enqueue((char*)&packet, size);
 	if (ret != size)
 	{
 		// 여유공간이 부족하여 메시지를 담을 수 없다는 것은 서버가 처리해줄 수 있는 한계를 지났다는 것. 연결을 끊는다.
 		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);
 		return;
 	}
-
-	ret = session->sendQ.Enqueue((char*)&packet, size);
-	if (ret != size)
-	{
-		// 여유공간이 부족하여 메시지를 담을 수 없다는 것은 서버가 처리해줄 수 있는 한계를 지났다는 것. 연결을 끊는다.
-		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);
-		return;
-	}
-}
-void LanServer::MakeHeader(SerializationBuffer* header, SerializationBuffer* packet)
-{
-	LAN_PACKET_HEADER stHeader;
-	stHeader.len = packet->GetUseSize();
-	header->ClearBuffer();
-	header->PutData((char*)&stHeader, sizeof(LAN_PACKET_HEADER));
 }
 SESSION* LanServer::AcquireSessionLock(DWORD64 sessionID)
 {
@@ -552,15 +539,18 @@ unsigned int LanServer::AcceptThread()
 		//--------------------------------------------------------------------
 		SESSION* session = CreateSession(client, ip, port);
 		int sendBufSize = 0;
-		setsockopt(session->socket, SOL_SOCKET, SO_SNDBUF, (char*) & sendBufSize, sizeof(sendBufSize));
+		setsockopt(session->socket, SOL_SOCKET, SO_SNDBUF, (char*)&sendBufSize, sizeof(sendBufSize));
 		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
 		// 신규 접속자의 정보를 컨텐츠 부에 알림
 		//--------------------------------------------------------------------
+		InterlockedIncrement(&session->ioCount);
 		OnClientJoin(session->sessionID);
-
 		RecvPost(session);
+		if (InterlockedDecrement(&session->ioCount) == 0)
+			DisconnectSession(session);
+
 		InterlockedIncrement(&_monitoring.curTPS.accept);
 	}
 	return 0;

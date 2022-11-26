@@ -3,18 +3,19 @@
 #include "Base.h"
 
 JAYNAMESPACE
-/**
-* @file		RingBuffer.h
-* @brief	Network RingBuffer Class
-* @details	TCP/IP 프로토콜 송수신을 위한 링버퍼 클래스
-* @author   고재현
-* @date		2022-11-22
-* @version  1.0.4
-**/
+class LanServer;
 class RingBuffer
 {
+	/**
+	* @file		RingBuffer.h
+	* @brief	Network RingBuffer Class
+	* @details	TCP/IP 프로토콜 송수신을 위한 링버퍼 클래스
+	* @author   고재현
+	* @date		2022-11-26
+	* @version  1.0.5
+	**/
 public:
-	RingBuffer(int bufferSize = 1024);
+	RingBuffer(int bufferSize = 8192);
 	~RingBuffer();
 public:
 	/**
@@ -68,6 +69,14 @@ public:
 	int Peek(char* output, int size);
 
 	/**
+	* @brief	버퍼의 모든 데이터 삭제
+	* @details
+	* @param	void
+	* @return	void
+	**/
+	void ClearBuffer(void);
+private:
+	/**
 	* @brief	원하는 길이만큼 읽기위치에서 삭제 / 쓰기위치 이동
 	* @details
 	* @param	int(원하는 길이)
@@ -75,14 +84,6 @@ public:
 	**/
 	void MoveFront(int size);
 	void MoveRear(int size);
-
-	/**
-	* @brief	버퍼의 모든 데이터 삭제
-	* @details
-	* @param	void
-	* @return	void
-	**/
-	void ClearBuffer(void);
 
 	/**
 	* @brief	버퍼의 Front 포인터 얻음
@@ -113,6 +114,7 @@ private:
 	char* _front;
 	char* _rear;
 	int _bufferSize;
+	friend class LanServer;
 };
 JAYNAMESPACEEND
 

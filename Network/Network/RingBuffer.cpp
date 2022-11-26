@@ -135,6 +135,11 @@ int RingBuffer::Peek(char * output, int size)
 	}
 	return size;
 }
+void RingBuffer::ClearBuffer(void)
+{
+	_front = _buffer;
+	_rear = _buffer;
+}
 void RingBuffer::MoveFront(int size)
 {
 	_front = ((_front + size - _buffer) % _bufferSize) + _buffer;
@@ -142,11 +147,6 @@ void RingBuffer::MoveFront(int size)
 void RingBuffer::MoveRear(int size)
 {
 	_rear = ((_rear + size - _buffer) % _bufferSize) + _buffer;
-}
-void RingBuffer::ClearBuffer(void)
-{
-	_front = _buffer;
-	_rear = _buffer;
 }
 char * RingBuffer::GetFrontBufferPtr(void)
 {
