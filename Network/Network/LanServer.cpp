@@ -89,11 +89,6 @@ void LanServer::Stop()
 	// Release
 	//--------------------------------------------------------------------
 	Release();
-
-	Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - session count: %d", __FUNCTIONW__, __LINE__, _sessionCnt);
-	Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - packet capacity: %d, packet useCount: %d", __FUNCTIONW__, __LINE__, 
-		SerializationBuffer::_packetPool.GetCapacityCount(),
-		SerializationBuffer::_packetPool.GetUseCount());
 }
 bool LanServer::Disconnect(DWORD64 sessionID)
 {

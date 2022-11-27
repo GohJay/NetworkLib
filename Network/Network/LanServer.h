@@ -18,7 +18,7 @@ class LanServer
 	**/
 public:
 	LanServer();
-	~LanServer();
+	virtual ~LanServer();
 public:
 	bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, bool nagle = true);
 	void Stop();
