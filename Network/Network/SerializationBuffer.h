@@ -1,6 +1,7 @@
 #ifndef __SERIALIZATIONBUFFER__H_
 #define __SERIALIZATIONBUFFER__H_
 #include "Base.h"
+#include "ObjectPool.h"
 
 JAYNAMESPACE
 class LanServer;
@@ -12,11 +13,27 @@ class SerializationBuffer
 	* @details	네트워크 송수신을 위한 직렬화버퍼 클래스
 	* @author   고재현
 	* @date		2022-11-26
-	* @version  1.0.4
+	* @version  1.0.5
 	**/
-public:
+protected:
 	SerializationBuffer(int bufferSize = 1024);
 	virtual ~SerializationBuffer();
+public:
+	/**
+	* @brief	직렬화 버퍼 할당
+	* @details
+	* @param	void
+	* @return	SerializationBuffer*(직렬화 버퍼 포인터)
+	**/
+	static SerializationBuffer* Alloc(void);
+
+	/**
+	* @brief	직렬화 버퍼 해제
+	* @details
+	* @param	SerializationBuffer*(직렬화 버퍼 포인터)
+	* @return	void
+	**/
+	static void Free(SerializationBuffer* packet);
 public:
 	/**
 	* @brief	버퍼 사이즈 얻기
@@ -121,7 +138,7 @@ protected:
 	* @param	const char*(헤더 포인터), int(크기)
 	* @return	int(입력된 헤더 크기)
 	**/
-	int PutHeader(const char* input, int size);
+	int PutHeader(const char* header, int size);
 public:
 	SerializationBuffer& operator = (const SerializationBuffer& packet);
 
@@ -171,6 +188,8 @@ protected:
 	char* _rear;
 	char* _header;
 	int _bufferSize;
+	static ObjectPool<SerializationBuffer> _packetPool;
+	friend class ObjectPool<SerializationBuffer>;
 	friend class LanServer;
 };
 JAYNAMESPACEEND

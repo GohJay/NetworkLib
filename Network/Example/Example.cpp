@@ -1,90 +1,65 @@
-#include "../Network/RingBuffer.h"
-#include "../Network/SerializationBuffer.h"
+#include "EchoServer.h"
+#include <conio.h>
+#include <time.h>
 #include <iostream>
-#include <thread>
+#include <Windows.h>
 #pragma comment(lib, "Network.lib")
 
-const char* data = "1234567890 abcdefghijklmnopqrstuvwxyz 1234567890 abcdefghijklmnopqrstuvwxyz 123451234567890 abcdefghijklmnopqrstuvwxyz 1";
-int size = strlen(data);
-Jay::RingBuffer g_RingBuffer(200);
+EchoServer g_Server;
+bool g_StopSignal = false;
 
-void SerializationTest()
+void Control()
 {
-	Jay::SerializationBuffer packet(512);
-	packet.PutData(data, size);
-
-	char buffer[512];
-	packet.GetData(buffer, size);
-	buffer[size] = '\0';
-	std::cout << buffer << std::endl;
-}
-void SingleTest()
-{
-	srand(3);
-	g_RingBuffer.Enqueue(data, size);
-	char buffer1[128];
-	char buffer2[128];
-	for (;;)
+	wchar_t controlKey;
+	if (_kbhit())
 	{
-		int randSize = rand() % size;
-		if (g_RingBuffer.Peek(buffer1, randSize) != randSize)
+		controlKey = _getwch();
+		if ((controlKey == L'q' || controlKey == L'Q'))
 		{
-			std::cout << "Peek error" << std::endl;
-			break;
+			g_StopSignal = true;
 		}
-		if (g_RingBuffer.Dequeue(buffer2, randSize) != randSize)
-		{
-			std::cout << "Dequeue error" << std::endl;
-			break;
-		}
-		if (memcmp(buffer1, buffer2, randSize) != 0)
-		{
-			std::cout << "Not same" << std::endl;
-			break;
-		}
-		if (g_RingBuffer.Enqueue(buffer1, randSize) != randSize)
-		{
-			std::cout << "Enqueue error" << std::endl;
-			break;
-		}
-		buffer1[randSize] = '\0';
-		std::cout << buffer1;
-		Sleep(200);
 	}
 }
-void EnqueueTest()
+void Monitor()
 {
-	for (;;)
-	{
-		if (g_RingBuffer.GetFreeSize() >= size)
-			g_RingBuffer.Enqueue(data, size);
-		Sleep(200);
-	}
-}
-void DequeueTest()
-{
-	for (;;)
-	{
-		int randSize = rand() % size;
-		char buffer[128];
-		int ret = g_RingBuffer.Dequeue(buffer, randSize);
-		buffer[ret] = '\0';
-		std::cout << buffer;
-		Sleep(200);
-	}
-}
+	tm stTime;
+	time_t timer;
+	timer = time(NULL);
+	localtime_s(&stTime, &timer);
 
+	wprintf_s(L"\
+[%d/%02d/%02d %02d:%02d:%02d]\n\
+------------------------------------\n\
+Session Count: %d\n\
+------------------------------------\n\
+Accept TPS: %d\n\
+Recv TPS: %d\n\
+Send TPS: %d\n\
+------------------------------------\n\
+\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec
+		, g_Server.GetSessionCount()
+		, g_Server.GetAcceptTPS()
+		, g_Server.GetRecvTPS()
+		, g_Server.GetSendTPS());
+}
 int main()
 {
-	SerializationTest();
-	return 0;
+	wchar_t ip[16] = L"0.0.0.0";
+	int port = 6000;
+	int workerCreateCnt = 7;
+	int workerRunningCnt = 0;
+	WORD sessionMax = 10000;
+	if (!g_Server.Start(ip, port, workerCreateCnt, workerRunningCnt, sessionMax))
+		return 0;
 
-	//SingleTest();
-	//return 0;
-	//
-	//std::thread enqueue_thread(EnqueueTest);
-	//std::thread dequeue_thread(DequeueTest);
-	//enqueue_thread.join();
-	//dequeue_thread.join();
-    //return 0;
+	while (!g_StopSignal)
+	{
+		Control();
+		Monitor();
+		Sleep(1000);
+	}
+
+	g_Server.Stop();
+	return 0;
 }

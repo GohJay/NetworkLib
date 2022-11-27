@@ -3,6 +3,7 @@
 #define PACKET_HEADER_SIZE	10
 
 USEJAYNAMESPACE
+ObjectPool<SerializationBuffer> SerializationBuffer::_packetPool(0, false);
 SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSize)
 {
 	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
@@ -14,6 +15,16 @@ SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSiz
 SerializationBuffer::~SerializationBuffer()
 {
 	free(_buffer);
+}
+SerializationBuffer* SerializationBuffer::Alloc(void)
+{
+	SerializationBuffer* packet = _packetPool.Alloc();
+	packet->ClearBuffer();
+	return packet;
+}
+void SerializationBuffer::Free(SerializationBuffer* packet)
+{
+	_packetPool.Free(packet);
 }
 int SerializationBuffer::GetBufferSize(void)
 {
@@ -89,13 +100,13 @@ char* SerializationBuffer::GetHeaderPtr(void)
 {
 	return _header;
 }
-int SerializationBuffer::PutHeader(const char* input, int size)
+int SerializationBuffer::PutHeader(const char* header, int size)
 {
 	int freeSize = _front - _buffer;
 	if (size > freeSize)
 		size = freeSize;
 	_header = _front - size;
-	memmove(_header, input, size);
+	memmove(_header, header, size);
 	return size;
 }
 SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer & packet)

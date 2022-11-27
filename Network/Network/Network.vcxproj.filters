@@ -13,11 +13,11 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Util">
-      <UniqueIdentifier>{eeec5dc8-2c20-49d0-8386-5e733e0b7209}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Base">
       <UniqueIdentifier>{979811f6-2514-4ce2-9885-bc70aed48819}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common">
+      <UniqueIdentifier>{eeec5dc8-2c20-49d0-8386-5e733e0b7209}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -34,21 +34,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Logger.h">
-      <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="Error.h">
-      <Filter>Base</Filter>
+      <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="Protocol.h">
-      <Filter>Base</Filter>
-    </ClInclude>
-    <ClInclude Include="Base.h">
       <Filter>Base</Filter>
     </ClInclude>
     <ClInclude Include="define.h">
       <Filter>Base</Filter>
     </ClInclude>
-    <ClInclude Include="Packet.h">
+    <ClInclude Include="ObjectPool.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Error.h">
+      <Filter>Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Base.h">
       <Filter>Base</Filter>
     </ClInclude>
   </ItemGroup>
@@ -63,7 +63,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
-      <Filter>Util</Filter>
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 #include "LanServer.h"
 #include "Error.h"
-#include "Packet.h"
+#include "Protocol.h"
 #include "Logger.h"
 #include <process.h>
 #include <synchapi.h>
@@ -11,10 +11,12 @@
 #define SESSIONID_KEY_MASK			0x7FFFFFFFFFFF0000
 #define SESSIONID_INVALIDBIT_MASK	0x8000000000000000
 #define MAKE_SESSIONID(key, index)	(key << 16) | index
+
 #define USER_MESSAGE_SEND			0x01
+#define SEND_BUFFER_MAX				100
 
 USEJAYNAMESPACE
-LanServer::LanServer() : _sessionKey(0)
+LanServer::LanServer() : _sessionCnt(0), _sessionKey(0)
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
@@ -30,12 +32,11 @@ LanServer::~LanServer()
 {
 	WSACleanup();
 }
-bool LanServer::Start(wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, bool nagle)
+bool LanServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, bool nagle)
 {
 	_workerCreateCnt = workerCreateCnt;
 	_workerRunningCnt = workerRunningCnt;
 	_sessionMax = sessionMax;
-	_sessionCnt = 0;
 
 	//--------------------------------------------------------------------
 	// Listen
@@ -44,7 +45,7 @@ bool LanServer::Start(wchar_t* ipaddress, int port, int workerCreateCnt, int wor
 		return false;
 
 	//--------------------------------------------------------------------
-	// Initialize
+	// Initial
 	//--------------------------------------------------------------------
 	if (!Initial())
 	{
@@ -75,10 +76,24 @@ void LanServer::Stop()
 	// Thread Exit Wait
 	//--------------------------------------------------------------------
 	HANDLE hHandle[2] = { _hAcceptThread, _hMonitoringThread };
-	WaitForMultipleObjects(2, hHandle, TRUE, INFINITE);
-	WaitForMultipleObjects(_workerCreateCnt, _hWorkerThread, TRUE, INFINITE);
+	DWORD ret;
+	ret = WaitForMultipleObjects(2, hHandle, TRUE, INFINITE);
+	if (ret == WAIT_FAILED)
+		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
 
+	ret = WaitForMultipleObjects(_workerCreateCnt, _hWorkerThread, TRUE, INFINITE);
+	if (ret == WAIT_FAILED)
+		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+
+	//--------------------------------------------------------------------
+	// Release
+	//--------------------------------------------------------------------
 	Release();
+
+	Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - session count: %d", __FUNCTIONW__, __LINE__, _sessionCnt);
+	Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - packet capacity: %d, packet useCount: %d", __FUNCTIONW__, __LINE__, 
+		SerializationBuffer::_packetPool.GetCapacityCount(),
+		SerializationBuffer::_packetPool.GetUseCount());
 }
 bool LanServer::Disconnect(DWORD64 sessionID)
 {
@@ -87,18 +102,14 @@ bool LanServer::Disconnect(DWORD64 sessionID)
 bool LanServer::SendPacket(DWORD64 sessionID, SerializationBuffer* packet)
 {
 	SESSION* session = AcquireSessionLock(sessionID);
-	if (session == nullptr)
-		return false;
-
-	LAN_PACKET_HEADER header;
-	MakeHeader(&header, packet);
-	packet->PutHeader((char*)&header, sizeof(LAN_PACKET_HEADER));
-	SendUnicast(session, packet);
-	SendPost(session);
-	ReleaseSessionLock(session);
-
-	InterlockedIncrement(&_monitoring.curTPS.send);
-	return true;
+	if (session != nullptr)
+	{
+		SendUnicast(session, packet);
+		SendPost(session);
+		ReleaseSessionLock(session);
+		return true;
+	}
+	return false;
 }
 int LanServer::GetSessionCount()
 {
@@ -116,7 +127,7 @@ int LanServer::GetSendTPS()
 {
 	return _monitoring.oldTPS.send;
 }
-bool LanServer::Listen(wchar_t* ipaddress, int port, bool nagle)
+bool LanServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 {
 	_listenSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (_listenSocket == INVALID_SOCKET)
@@ -205,15 +216,15 @@ bool LanServer::Initial()
 }
 void LanServer::Release()
 {
-	while (_indexStack.size() > 0)
-		_indexStack.pop();
-
 	for (int idx = 0; idx < _sessionMax; idx++)
 	{
 		SESSION* session = &_sessionArray[idx];
 		if ((session->sessionID & SESSIONID_INVALIDBIT_MASK) == 0)
-			closesocket(session->socket);
+			DisconnectSession(session);
 	}
+
+	while (_indexStack.size() > 0)
+		_indexStack.pop();
 
 	CloseHandle(_hCompletionPort);
 	CloseHandle(_hExitThreadEvent);
@@ -225,7 +236,7 @@ void LanServer::Release()
 	delete[] _hWorkerThread;
 	delete[] _sessionArray;
 }
-SESSION* LanServer::CreateSession(SOCKET socket, wchar_t* ipaddress, int port)
+SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
 	WORD index;
 	AcquireSRWLockExclusive(&_indexLock);
@@ -255,7 +266,9 @@ void LanServer::DisconnectSession(SESSION* session)
 	AcquireSRWLockExclusive(&session->lock);
 	session->sessionID |= SESSIONID_INVALIDBIT_MASK;
 	ReleaseSRWLockExclusive(&session->lock);
+
 	closesocket(session->socket);
+	CleanupSendBuffer(session);
 
 	AcquireSRWLockExclusive(&_indexLock);
 	_indexStack.push(index);
@@ -310,7 +323,7 @@ void LanServer::RecvPost(SESSION* session)
 			case WSAECONNRESET:
 				break;
 			default:
-				OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, WSAGetLastError());
+				OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, err);
 				break;
 			}
 
@@ -343,22 +356,30 @@ void LanServer::SendPost(SESSION* session)
 		return;
 	}
 
+	int packetCount = useSize / sizeof(void*);
+	if (packetCount > SEND_BUFFER_MAX)
+		packetCount = SEND_BUFFER_MAX;
+
 	//--------------------------------------------------------------------
 	// 송신할 직렬화 버퍼 포인터 Peek
 	//--------------------------------------------------------------------
-	int packetCount = useSize / sizeof(void*);
-	if (packetCount > 100)
-		packetCount = 100;
-
-	SerializationBuffer* packet[100];
-	session->sendQ.Peek((char*)packet, packetCount * sizeof(void*));
+	SerializationBuffer* packet[SEND_BUFFER_MAX];
+	int size = packetCount * sizeof(void*);
+	int ret = session->sendQ.Peek((char*)packet, size);
+	if (ret != size)
+	{
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, size, ret);
+		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+		// Disconnect 처리
+		// return;
+	}
 
 	//--------------------------------------------------------------------
 	// WSASend 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
 	ZeroMemory(&session->sendOverlapped, sizeof(session->sendOverlapped));
+	WSABUF wsaSendBuf[SEND_BUFFER_MAX];
 	session->sendBufCount = packetCount;
-	WSABUF wsaSendBuf[100];
 	for (int i = 0; i < session->sendBufCount; i++)
 	{
 		wsaSendBuf[i].len = packet[i]->GetPacketSize();
@@ -369,7 +390,7 @@ void LanServer::SendPost(SESSION* session)
 	// WSASend 처리
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
-	int ret = WSASend(session->socket, wsaSendBuf, session->sendBufCount, NULL, 0, &session->sendOverlapped, NULL);
+	ret = WSASend(session->socket, wsaSendBuf, session->sendBufCount, NULL, 0, &session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -381,7 +402,7 @@ void LanServer::SendPost(SESSION* session)
 			case WSAECONNRESET:
 				break;
 			default:
-				OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, WSAGetLastError());
+				OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, err);
 				break;
 			}
 
@@ -421,32 +442,63 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		//--------------------------------------------------------------------
 		if (session->recvQ.GetUseSize() < headerSize + header.len)
 			break;
-
 		session->recvQ.MoveFront(headerSize);
 
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼에 Payload 담기
 		//--------------------------------------------------------------------
-		SerializationBuffer packet;
-		ret = session->recvQ.Dequeue(packet.GetRearBufferPtr(), header.len);
+		SerializationBuffer* packet = SerializationBuffer::Alloc();
+		ret = session->recvQ.Dequeue(packet->GetRearBufferPtr(), header.len);
 		if (ret != header.len)
 		{
 			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, header.len, ret);
 			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			break;
 		}
-
-		packet.MoveRear(ret);
+		packet->MoveRear(ret);
 
 		//--------------------------------------------------------------------
 		// 컨텐츠 부에 Payload 를 담은 직렬화 버퍼 전달
 		//--------------------------------------------------------------------
-		OnRecv(session->sessionID, &packet);
+		OnRecv(session->sessionID, packet);
+		SerializationBuffer::Free(packet);
+
 		InterlockedIncrement(&_monitoring.curTPS.recv);
+	}
+}
+void LanServer::CompleteSendPacket(SESSION* session)
+{
+	//--------------------------------------------------------------------
+	// 송신용 링버퍼에 있는 직렬화 버퍼 Dequeue
+	//--------------------------------------------------------------------
+	SerializationBuffer* packet[SEND_BUFFER_MAX];
+	int size = session->sendBufCount * sizeof(void*);
+	int ret = session->sendQ.Dequeue((char*)packet, size);
+	if (ret != size)
+	{
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, size, ret);
+		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+	}
+
+	//--------------------------------------------------------------------
+	// 직렬화 버퍼 정리
+	//--------------------------------------------------------------------
+	while (session->sendBufCount > 0)
+	{
+		SerializationBuffer::Free(packet[session->sendBufCount - 1]);
+		session->sendBufCount--;
+		InterlockedIncrement(&_monitoring.curTPS.send);
 	}
 }
 void LanServer::SendUnicast(SESSION* session, SerializationBuffer* packet)
 {
+	//--------------------------------------------------------------------
+	// 네트워크 부 헤더 만들기
+	//--------------------------------------------------------------------
+	LAN_PACKET_HEADER header;
+	header.len = packet->GetUseSize();
+	packet->PutHeader((char*)&header, sizeof(LAN_PACKET_HEADER));
+
 	//--------------------------------------------------------------------
 	// 송신용 링버퍼에 보낼 직렬화 버퍼의 포인터 담기
 	//--------------------------------------------------------------------
@@ -457,6 +509,26 @@ void LanServer::SendUnicast(SESSION* session, SerializationBuffer* packet)
 		// 여유공간이 부족하여 메시지를 담을 수 없다는 것은 서버가 처리해줄 수 있는 한계를 지났다는 것. 연결을 끊는다.
 		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);
 		return;
+	}
+}
+void LanServer::CleanupSendBuffer(SESSION* session)
+{
+	int size = sizeof(void*);
+	while (session->sendQ.GetUseSize() >= size)
+	{
+		//--------------------------------------------------------------------
+		// 송신용 링버퍼에 있는 직렬화 버퍼 Dequeue
+		//--------------------------------------------------------------------
+		SerializationBuffer* packet[SEND_BUFFER_MAX];
+		int len = size * SEND_BUFFER_MAX;
+		int ret = session->sendQ.Dequeue((char*)packet, len);
+
+		//--------------------------------------------------------------------
+		// 직렬화 버퍼 정리
+		//--------------------------------------------------------------------
+		int packetCount = ret / size;
+		for (int i = 0; i < packetCount; i++)
+			SerializationBuffer::Free(packet[i]);
 	}
 }
 SESSION* LanServer::AcquireSessionLock(DWORD64 sessionID)
@@ -482,17 +554,17 @@ void LanServer::MessageProc(UINT message, WPARAM wParam, LPARAM lParam)
 	//--------------------------------------------------------------------
 	switch (message)
 	{
-	case USER_MESSAGE_SEND:
-	{
-		DWORD64 sessionID = wParam;
-		SESSION* session = AcquireSessionLock(sessionID);
-		if (session != nullptr)
+		case USER_MESSAGE_SEND:
 		{
-			SendPost(session);
-			ReleaseSessionLock(session);
+			DWORD64 sessionID = wParam;
+			SESSION* session = AcquireSessionLock(sessionID);
+			if (session != nullptr)
+			{
+				SendPost(session);
+				ReleaseSessionLock(session);
+			}
 		}
-	}
-	break;
+		break;
 	default:
 		break;
 	}
@@ -588,7 +660,7 @@ unsigned int LanServer::WorkerThread()
 				case WSAECONNRESET:
 					break;
 				default:
-					OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, WSAGetLastError());
+					OnError(NET_ERROR_SOCKET_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, err);
 					break;
 				}
 			}
@@ -608,14 +680,7 @@ unsigned int LanServer::WorkerThread()
 			else if (&session->sendOverlapped == overlapped)
 			{
 				// Send 완료 통지 처리
-				SerializationBuffer* packet[100];
-				session->sendQ.Dequeue((char*)packet, session->sendBufCount * sizeof(void*));
-				while (session->sendBufCount > 0)
-				{
-					delete packet[session->sendBufCount - 1];
-					session->sendBufCount--;
-				}
-
+				CompleteSendPacket(session);
 				InterlockedExchange((LONG*)&session->sendFlag, FALSE);
 				if (session->sendQ.GetUseSize() > 0)
 					SendPost(session);

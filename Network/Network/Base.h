@@ -14,8 +14,11 @@
 #define BASE_API __declspec(dllimport)
 #endif //!API_EXPORTS
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif //!WIN32_LEAN_AND_MEAN
 #include <WinSock2.h>
-#include <windows.h>
+#include <Windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 #else

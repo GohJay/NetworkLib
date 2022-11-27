@@ -119,7 +119,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -141,7 +141,7 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />
-    <ClInclude Include="Packet.h" />
+    <ClInclude Include="ObjectPool.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="SerializationBuffer.h" />
     <ClInclude Include="RingBuffer.h" />
