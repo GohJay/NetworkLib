@@ -5,7 +5,7 @@
 #pragma comment(lib, "DbgHelp.lib")
 
 using namespace Jay;
-long CrashDump::_DumpCount = 0;
+long CrashDump::_DumpFlag = FALSE;
 CrashDump CrashDump::_instance;
 
 CrashDump::CrashDump()
@@ -32,17 +32,21 @@ void CrashDump::Crash(void)
 }
 LONG __stdcall CrashDump::MyExceptionFilter(PEXCEPTION_POINTERS pExceptionPointer)
 {
-	SYSTEMTIME stNowTime;
-	long DumpCount = InterlockedIncrement(&_DumpCount);
+	//--------------------------------------------------------------------
+	// 다른 스레드에서 이미 덤프 파일을 생성중인 경우 Sleep
+	//--------------------------------------------------------------------
+	if (InterlockedExchange(&_DumpFlag, TRUE) == TRUE)
+		Sleep(INFINITE);
 
 	//--------------------------------------------------------------------
 	// 현재 날짜와 시간을 알아온다.
 	//--------------------------------------------------------------------
+	SYSTEMTIME stNowTime;
 	WCHAR filename[MAX_PATH];
 	GetLocalTime(&stNowTime);
 
-	swprintf(filename, MAX_PATH, L"Dump_%d%02d%02d_%02d.%02d.%02d_%d.dmp",
-		stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, DumpCount);
+	swprintf(filename, MAX_PATH, L"Dump_%d%02d%02d_%02d.%02d.%02d.dmp",
+		stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond);
 	wprintf_s(L"\n\n\n!!! Crash Error !!! %d.%02d.%02d / %02d:%02d:%02d\n",
 		stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond);
 	wprintf_s(L"Now save dump file...\n");

@@ -110,6 +110,10 @@ int LanServer::GetSessionCount()
 {
 	return _sessionCnt;
 }
+int LanServer::GetUsePacketCount()
+{
+	return SerializationBuffer::_packetPool.GetUseCount();
+}
 int LanServer::GetAcceptTPS()
 {
 	return _monitoring.oldTPS.accept;
@@ -179,12 +183,7 @@ bool LanServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 }
 bool LanServer::Initial()
 {
-	_monitoring.curTPS.accept = 0;
-	_monitoring.curTPS.recv = 0;
-	_monitoring.curTPS.send = 0;
-	_monitoring.oldTPS.accept = 0;
-	_monitoring.oldTPS.recv = 0;
-	_monitoring.oldTPS.send = 0;
+	memset(&_monitoring, 0, sizeof(MONITORING));
 
 	_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, _workerRunningCnt);
 	if (_hCompletionPort == NULL)

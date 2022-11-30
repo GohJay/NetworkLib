@@ -25,6 +25,7 @@ public:
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, SerializationBuffer* packet);
 	int GetSessionCount();
+	int GetUsePacketCount();
 	int GetAcceptTPS();
 	int GetRecvTPS();
 	int GetSendTPS();

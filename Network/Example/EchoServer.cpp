@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "EchoServer.h"
-#include <time.h>
 
-extern bool g_StopSignal;
 EchoServer::EchoServer()
 {
 }

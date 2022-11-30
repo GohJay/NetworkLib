@@ -11,8 +11,8 @@ namespace Jay
 		* @brief	Crash 에러의 문제 추적을 위한 메모리 덤프 클래스
 		* @details	Crash 에러 발생 시 덤프 파일에 메모리 상태를 로깅한다.
 		* @author   고재현
-		* @date		2022-11-21
-		* @version  1.0.1
+		* @date		2022-11-28
+		* @version  1.0.2
 		**/
 	private:
 		CrashDump();
@@ -26,7 +26,7 @@ namespace Jay
 		static int _custom_Report_hook(int ireposttype, char* message, int* returnvalue);
 		static void myPureCallHandler(void);
 	private:
-		static long _DumpCount;
+		static long _DumpFlag;
 		static CrashDump _instance;
 	};
 }
