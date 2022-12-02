@@ -18,6 +18,7 @@ void EchoServer::OnClientJoin(DWORD64 sessionID)
 	Jay::SerializationBuffer* sc_packet = Jay::SerializationBuffer::Alloc();
 	*sc_packet << login;
 	SendPacket(sessionID, sc_packet);
+	Jay::SerializationBuffer::Free(sc_packet);
 }
 void EchoServer::OnClientLeave(DWORD64 sessionID)
 {
@@ -30,6 +31,7 @@ void EchoServer::OnRecv(DWORD64 sessionID, Jay::SerializationBuffer* packet)
 	Jay::SerializationBuffer* sc_packet = Jay::SerializationBuffer::Alloc();
 	*sc_packet << echo;
 	SendPacket(sessionID, sc_packet);
+	Jay::SerializationBuffer::Free(sc_packet);
 }
 void EchoServer::OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam)
 {

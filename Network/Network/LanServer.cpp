@@ -496,11 +496,13 @@ void LanServer::SendUnicast(SESSION* session, SerializationBuffer* packet)
 	//--------------------------------------------------------------------
 	// 송신용 링버퍼에 보낼 직렬화 버퍼의 포인터 담기
 	//--------------------------------------------------------------------
+	packet->IncrementRefCount();
 	int size = sizeof(void*);
 	int ret = session->sendQ.Enqueue((char*)&packet, size);
 	if (ret != size)
 	{
 		// 여유공간이 부족하여 메시지를 담을 수 없다는 것은 서버가 처리해줄 수 있는 한계를 지났다는 것. 연결을 끊는다.
+		packet->DecrementRefCount();
 		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);
 		return;
 	}

@@ -60,6 +60,14 @@ public:
 	int GetUseSize(void);
 
 	/**
+	* @brief	버퍼의 참조 카운트 얻기
+	* @details
+	* @param	void
+	* @return	int(참조 카운트)
+	**/
+	int	GetRefCount(void);
+
+	/**
 	* @brief	버퍼 크기 조정
 	* @details
 	* @param	int(조정할 버퍼 크기)
@@ -139,13 +147,27 @@ protected:
 	* @return	int(입력된 헤더 크기)
 	**/
 	int PutHeader(const char* header, int size);
+
+	/**
+	* @brief	버퍼의 참조 카운트 증가
+	* @details
+	* @param	void
+	* @return	int(증가된 참조 카운트 값)
+	**/
+	int IncrementRefCount(void);
+
+	/**
+	* @brief	버퍼의 참조 카운트 감소
+	* @details
+	* @param	void
+	* @return	int(감소된 참조 카운트 값)
+	**/
+	int DecrementRefCount(void);
 public:
 	SerializationBuffer& operator = (const SerializationBuffer& packet);
 
 	SerializationBuffer& operator << (const char value);
 	SerializationBuffer& operator << (const unsigned char value);
-
-	SerializationBuffer& operator << (const wchar_t value);
 
 	SerializationBuffer& operator << (const short value);
 	SerializationBuffer& operator << (const unsigned short value);
@@ -164,8 +186,6 @@ public:
 
 	SerializationBuffer& operator >> (char& value);
 	SerializationBuffer& operator >> (unsigned char& value);
-
-	SerializationBuffer& operator >> (const wchar_t value);
 
 	SerializationBuffer& operator >> (short& value);
 	SerializationBuffer& operator >> (unsigned short& value);
@@ -188,6 +208,7 @@ protected:
 	char* _rear;
 	char* _header;
 	int _bufferSize;
+	long _refCount;
 	static ObjectPool<SerializationBuffer> _packetPool;
 	friend class ObjectPool<SerializationBuffer>;
 	friend class LanServer;

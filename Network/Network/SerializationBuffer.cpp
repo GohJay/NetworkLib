@@ -4,7 +4,7 @@
 
 USEJAYNAMESPACE
 ObjectPool<SerializationBuffer> SerializationBuffer::_packetPool(0, false);
-SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSize)
+SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
 {
 	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
 	_bufferEnd = _buffer + _bufferSize + PACKET_HEADER_SIZE;
@@ -20,11 +20,13 @@ SerializationBuffer* SerializationBuffer::Alloc(void)
 {
 	SerializationBuffer* packet = _packetPool.Alloc();
 	packet->ClearBuffer();
+	packet->_refCount = 1;
 	return packet;
 }
 void SerializationBuffer::Free(SerializationBuffer* packet)
 {
-	_packetPool.Free(packet);
+	if (packet->DecrementRefCount() == 0)
+		_packetPool.Free(packet);
 }
 int SerializationBuffer::GetBufferSize(void)
 {
@@ -38,8 +40,15 @@ int SerializationBuffer::GetUseSize(void)
 {
 	return _rear - _front;
 }
+int SerializationBuffer::GetRefCount(void)
+{
+	return _refCount;
+}
 void SerializationBuffer::Resize(int bufferSize)
 {
+	if (_bufferSize >= bufferSize)
+		return;
+
 	char* buffer = (char*)malloc(bufferSize + PACKET_HEADER_SIZE);
 	char* rear = buffer + (_rear - _buffer);
 	char* front = buffer + (_front - _buffer);
@@ -109,6 +118,14 @@ int SerializationBuffer::PutHeader(const char* header, int size)
 	memmove(_header, header, size);
 	return size;
 }
+int SerializationBuffer::IncrementRefCount(void)
+{
+	return InterlockedIncrement(&_refCount);
+}
+int SerializationBuffer::DecrementRefCount(void)
+{
+	return InterlockedDecrement(&_refCount);
+}
 SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer & packet)
 {
 	free(_buffer);
@@ -118,6 +135,7 @@ SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer &
 	_rear = _buffer + (packet._rear - packet._buffer);
 	_front = _buffer + (packet._front - packet._buffer);
 	_header = _front;
+	_refCount = packet._refCount;
 	memmove(_front, packet._front, packet._rear - packet._front);
 	return *this;
 }
@@ -128,12 +146,6 @@ SerializationBuffer & SerializationBuffer::operator<<(const char value)
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator<<(const unsigned char value)
-{
-	memmove(_rear, (char*)&value, sizeof(value));
-	MoveRear(sizeof(value));
-	return *this;
-}
-SerializationBuffer & SerializationBuffer::operator<<(const wchar_t value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
@@ -206,12 +218,6 @@ SerializationBuffer & SerializationBuffer::operator >> (char &value)
 	return *this;
 }
 SerializationBuffer & SerializationBuffer::operator >> (unsigned char &value)
-{
-	memmove((char*)&value, _front, sizeof(value));
-	MoveFront(sizeof(value));
-	return *this;
-}
-SerializationBuffer & SerializationBuffer::operator >> (const wchar_t value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
