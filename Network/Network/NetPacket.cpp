@@ -1,10 +1,10 @@
-#include "SerializationBuffer.h"
+#include "NetPacket.h"
 
 #define PACKET_HEADER_SIZE	10
 
 USEJAYNAMESPACE
-ObjectPool<SerializationBuffer> SerializationBuffer::_packetPool(0, false);
-SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
+ObjectPool<NetPacket> NetPacket::_packetPool(0, false);
+NetPacket::NetPacket(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
 {
 	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
 	_bufferEnd = _buffer + _bufferSize + PACKET_HEADER_SIZE;
@@ -12,39 +12,37 @@ SerializationBuffer::SerializationBuffer(int bufferSize) : _bufferSize(bufferSiz
 	_rear = _buffer + PACKET_HEADER_SIZE;
 	_header = _front;
 }
-SerializationBuffer::~SerializationBuffer()
+NetPacket::~NetPacket()
 {
 	free(_buffer);
 }
-SerializationBuffer* SerializationBuffer::Alloc(void)
+NetPacket* NetPacket::Alloc(void)
 {
-	SerializationBuffer* packet = _packetPool.Alloc();
+	NetPacket* packet = _packetPool.Alloc();
 	packet->ClearBuffer();
-	packet->_refCount = 1;
 	return packet;
 }
-void SerializationBuffer::Free(SerializationBuffer* packet)
+void NetPacket::Free(NetPacket* packet)
 {
-	if (packet->DecrementRefCount() == 0)
-		_packetPool.Free(packet);
+	_packetPool.Free(packet);
 }
-int SerializationBuffer::GetBufferSize(void)
+int NetPacket::GetBufferSize(void)
 {
 	return _bufferSize;
 }
-int SerializationBuffer::GetFreeSize(void)
+int NetPacket::GetFreeSize(void)
 {
 	return _bufferEnd - _rear;
 }
-int SerializationBuffer::GetUseSize(void)
+int NetPacket::GetUseSize(void)
 {
 	return _rear - _front;
 }
-int SerializationBuffer::GetRefCount(void)
+int NetPacket::GetRefCount(void)
 {
 	return _refCount;
 }
-void SerializationBuffer::Resize(int bufferSize)
+void NetPacket::Resize(int bufferSize)
 {
 	if (_bufferSize >= bufferSize)
 		return;
@@ -61,13 +59,13 @@ void SerializationBuffer::Resize(int bufferSize)
 	_bufferEnd = _buffer + bufferSize + PACKET_HEADER_SIZE;
 	_bufferSize = bufferSize;
 }
-void SerializationBuffer::ClearBuffer(void)
+void NetPacket::ClearBuffer(void)
 {
 	_front = _buffer + PACKET_HEADER_SIZE;
 	_rear = _buffer + PACKET_HEADER_SIZE;
 	_header = _front;
 }
-int SerializationBuffer::PutData(const char * input, int size)
+int NetPacket::PutData(const char * input, int size)
 {
 	int freeSize = GetFreeSize();
 	if (size > freeSize)
@@ -76,7 +74,7 @@ int SerializationBuffer::PutData(const char * input, int size)
 	MoveRear(size);
 	return size;
 }
-int SerializationBuffer::GetData(char * output, int size)
+int NetPacket::GetData(char * output, int size)
 {
 	int useSize = GetUseSize();
 	if (size > useSize)
@@ -85,31 +83,31 @@ int SerializationBuffer::GetData(char * output, int size)
 	MoveFront(size);
 	return size;
 }
-int SerializationBuffer::GetPacketSize(void)
+int NetPacket::GetPacketSize(void)
 {
 	return _rear - _header;
 }
-void SerializationBuffer::MoveFront(int size)
+void NetPacket::MoveFront(int size)
 {
 	_front += size;
 }
-void SerializationBuffer::MoveRear(int size)
+void NetPacket::MoveRear(int size)
 {
 	_rear += size;
 }
-char* SerializationBuffer::GetFrontBufferPtr(void)
+char* NetPacket::GetFrontBufferPtr(void)
 {
 	return _front;
 }
-char* SerializationBuffer::GetRearBufferPtr(void)
+char* NetPacket::GetRearBufferPtr(void)
 {
 	return _rear;
 }
-char* SerializationBuffer::GetHeaderPtr(void)
+char* NetPacket::GetHeaderPtr(void)
 {
 	return _header;
 }
-int SerializationBuffer::PutHeader(const char* header, int size)
+int NetPacket::PutHeader(const char* header, int size)
 {
 	int freeSize = _front - _buffer;
 	if (size > freeSize)
@@ -118,15 +116,15 @@ int SerializationBuffer::PutHeader(const char* header, int size)
 	memmove(_header, header, size);
 	return size;
 }
-int SerializationBuffer::IncrementRefCount(void)
+int NetPacket::IncrementRefCount(void)
 {
 	return InterlockedIncrement(&_refCount);
 }
-int SerializationBuffer::DecrementRefCount(void)
+int NetPacket::DecrementRefCount(void)
 {
 	return InterlockedDecrement(&_refCount);
 }
-SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer & packet)
+NetPacket & NetPacket::operator=(const NetPacket & packet)
 {
 	free(_buffer);
 	_bufferSize = packet._bufferSize;
@@ -139,145 +137,145 @@ SerializationBuffer & SerializationBuffer::operator=(const SerializationBuffer &
 	memmove(_front, packet._front, packet._rear - packet._front);
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const char value)
+NetPacket & NetPacket::operator<<(const char value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const unsigned char value)
+NetPacket & NetPacket::operator<<(const unsigned char value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const short value)
+NetPacket & NetPacket::operator<<(const short value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const unsigned short value)
+NetPacket & NetPacket::operator<<(const unsigned short value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const long value)
+NetPacket & NetPacket::operator<<(const long value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const unsigned long value)
+NetPacket & NetPacket::operator<<(const unsigned long value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const long long value)
+NetPacket & NetPacket::operator<<(const long long value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const unsigned long long value)
+NetPacket & NetPacket::operator<<(const unsigned long long value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const int value)
+NetPacket & NetPacket::operator<<(const int value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const unsigned int value)
+NetPacket & NetPacket::operator<<(const unsigned int value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const float value)
+NetPacket & NetPacket::operator<<(const float value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator<<(const double value)
+NetPacket & NetPacket::operator<<(const double value)
 {
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (char &value)
+NetPacket & NetPacket::operator >> (char &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (unsigned char &value)
+NetPacket & NetPacket::operator >> (unsigned char &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (short & value)
+NetPacket & NetPacket::operator >> (short & value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (unsigned short &value)
+NetPacket & NetPacket::operator >> (unsigned short &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (long &value)
+NetPacket & NetPacket::operator >> (long &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (unsigned long &value)
+NetPacket & NetPacket::operator >> (unsigned long &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (long long &value)
+NetPacket & NetPacket::operator >> (long long &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (unsigned long long &value)
+NetPacket & NetPacket::operator >> (unsigned long long &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (int &value)
+NetPacket & NetPacket::operator >> (int &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (unsigned int &value)
+NetPacket & NetPacket::operator >> (unsigned int &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (float &value)
+NetPacket & NetPacket::operator >> (float &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
-SerializationBuffer & SerializationBuffer::operator >> (double &value)
+NetPacket & NetPacket::operator >> (double &value)
 {
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));

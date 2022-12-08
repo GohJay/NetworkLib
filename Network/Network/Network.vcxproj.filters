@@ -27,9 +27,6 @@
     <ClInclude Include="RingBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SerializationBuffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="LanServer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -51,12 +48,15 @@
     <ClInclude Include="Base.h">
       <Filter>Base</Filter>
     </ClInclude>
+    <ClInclude Include="NetPacket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NetPacketPtr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SerializationBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="LanServer.cpp">
@@ -64,6 +64,12 @@
     </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="NetPacket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NetPacketPtr.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

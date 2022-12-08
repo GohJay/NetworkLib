@@ -10,6 +10,6 @@ private:
 	bool OnConnectionRequest(const wchar_t* ipaddress, int port);
 	void OnClientJoin(DWORD64 sessionID);
 	void OnClientLeave(DWORD64 sessionID);
-	void OnRecv(DWORD64 sessionID, Jay::SerializationBuffer* packet);
+	void OnRecv(DWORD64 sessionID, Jay::NetPacketPtr packet);
 	void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam);
 };

@@ -2,7 +2,7 @@
 #define __LANSERVER__H_
 #include "Base.h"
 #include "define.h"
-#include "SerializationBuffer.h"
+#include "NetPacketPtr.h"
 #include <stack>
 
 JAYNAMESPACE
@@ -23,7 +23,7 @@ public:
 	bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, bool nagle = true);
 	void Stop();
 	bool Disconnect(DWORD64 sessionID);
-	bool SendPacket(DWORD64 sessionID, SerializationBuffer* packet);
+	bool SendPacket(DWORD64 sessionID, NetPacketPtr packet);
 	int GetSessionCount();
 	int GetUsePacketCount();
 	int GetAcceptTPS();
@@ -33,7 +33,7 @@ protected:
 	virtual bool OnConnectionRequest(const wchar_t* ipaddress, int port) = 0;
 	virtual void OnClientJoin(DWORD64 sessionID) = 0;
 	virtual void OnClientLeave(DWORD64 sessionID) = 0;
-	virtual void OnRecv(DWORD64 sessionID, SerializationBuffer* packet) = 0;
+	virtual void OnRecv(DWORD64 sessionID, NetPacketPtr packet) = 0;
 	virtual void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) = 0;
 private:
 	bool Listen(const wchar_t* ipaddress, int port, bool nagle);
@@ -45,7 +45,7 @@ private:
 	void SendPost(SESSION* session);
 	void CompleteRecvPacket(SESSION* session);
 	void CompleteSendPacket(SESSION* session);
-	void SendUnicast(SESSION* session, SerializationBuffer* packet);
+	void SendUnicast(SESSION* session, NetPacket* packet);
 	void CleanupSendBuffer(SESSION* session);
 	SESSION* AcquireSessionLock(DWORD64 sessionID);
 	void ReleaseSessionLock(SESSION* session);

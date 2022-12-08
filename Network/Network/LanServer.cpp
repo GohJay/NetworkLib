@@ -10,7 +10,7 @@
 #define SESSIONID_INDEX_MASK		0x000000000000FFFF
 #define SESSIONID_KEY_MASK			0x7FFFFFFFFFFF0000
 #define SESSIONID_INVALIDBIT_MASK	0x8000000000000000
-#define MAKE_SESSIONID(key, index)	(key << 16) | index
+#define MAKE_SESSIONID(key, index)	((key) << 16) | (index)
 
 #define USER_MESSAGE_SEND			0x01
 #define SEND_BUFFER_MAX				100
@@ -94,12 +94,12 @@ bool LanServer::Disconnect(DWORD64 sessionID)
 {
 	return false;
 }
-bool LanServer::SendPacket(DWORD64 sessionID, SerializationBuffer* packet)
+bool LanServer::SendPacket(DWORD64 sessionID, NetPacketPtr packet)
 {
 	SESSION* session = AcquireSessionLock(sessionID);
 	if (session != nullptr)
 	{
-		SendUnicast(session, packet);
+		SendUnicast(session, *packet);
 		SendPost(session);
 		ReleaseSessionLock(session);
 		return true;
@@ -112,7 +112,7 @@ int LanServer::GetSessionCount()
 }
 int LanServer::GetUsePacketCount()
 {
-	return SerializationBuffer::_packetPool.GetUseCount();
+	return NetPacket::_packetPool.GetUseCount();
 }
 int LanServer::GetAcceptTPS()
 {
@@ -357,12 +357,12 @@ void LanServer::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// 송신할 직렬화 버퍼 포인터 Peek
 	//--------------------------------------------------------------------
-	SerializationBuffer* packet[SEND_BUFFER_MAX];
+	NetPacket* packetArray[SEND_BUFFER_MAX];
 	int size = packetCount * sizeof(void*);
-	int ret = session->sendQ.Peek((char*)packet, size);
+	int ret = session->sendQ.Peek((char*)packetArray, size);
 	if (ret != size)
 	{
-		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, size, ret);
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, size, ret);
 		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 		// Disconnect 처리
 		// return;
@@ -376,8 +376,8 @@ void LanServer::SendPost(SESSION* session)
 	session->sendBufCount = packetCount;
 	for (int i = 0; i < session->sendBufCount; i++)
 	{
-		wsaSendBuf[i].len = packet[i]->GetPacketSize();
-		wsaSendBuf[i].buf = packet[i]->GetHeaderPtr();
+		wsaSendBuf[i].len = packetArray[i]->GetPacketSize();
+		wsaSendBuf[i].buf = packetArray[i]->GetHeaderPtr();
 	}
 
 	//--------------------------------------------------------------------
@@ -426,7 +426,7 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		int ret = session->recvQ.Peek((char*)&header, headerSize);
 		if (ret != headerSize)
 		{
-			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, headerSize, ret);
+			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, headerSize, ret);
 			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			break;
 		}
@@ -441,11 +441,11 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼에 Payload 담기
 		//--------------------------------------------------------------------
-		SerializationBuffer* packet = SerializationBuffer::Alloc();
+		NetPacketPtr packet;
 		ret = session->recvQ.Dequeue(packet->GetRearBufferPtr(), header.len);
 		if (ret != header.len)
 		{
-			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, header.len, ret);
+			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, header.len, ret);
 			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			break;
 		}
@@ -455,8 +455,6 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		// 컨텐츠 부에 Payload 를 담은 직렬화 버퍼 전달
 		//--------------------------------------------------------------------
 		OnRecv(session->sessionID, packet);
-		SerializationBuffer::Free(packet);
-
 		InterlockedIncrement(&_monitoring.curTPS.recv);
 	}
 }
@@ -465,26 +463,27 @@ void LanServer::CompleteSendPacket(SESSION* session)
 	//--------------------------------------------------------------------
 	// 송신용 링버퍼에 있는 직렬화 버퍼 Dequeue
 	//--------------------------------------------------------------------
-	SerializationBuffer* packet[SEND_BUFFER_MAX];
+	NetPacket* packetArray[SEND_BUFFER_MAX];
 	int size = session->sendBufCount * sizeof(void*);
-	int ret = session->sendQ.Dequeue((char*)packet, size);
+	int ret = session->sendQ.Dequeue((char*)packetArray, size);
 	if (ret != size)
 	{
-		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", NET_FATAL_INVALID_SIZE, size, ret);
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, size, ret);
 		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 	}
 
 	//--------------------------------------------------------------------
 	// 직렬화 버퍼 정리
 	//--------------------------------------------------------------------
-	while (session->sendBufCount > 0)
+	for (int i = 0; i < session->sendBufCount; i++)
 	{
-		SerializationBuffer::Free(packet[session->sendBufCount - 1]);
-		session->sendBufCount--;
+		if (packetArray[i]->DecrementRefCount() == 0)
+			NetPacket::Free(packetArray[i]);
 		InterlockedIncrement(&_monitoring.curTPS.send);
 	}
+	session->sendBufCount = 0; 
 }
-void LanServer::SendUnicast(SESSION* session, SerializationBuffer* packet)
+void LanServer::SendUnicast(SESSION* session, NetPacket* packet)
 {
 	//--------------------------------------------------------------------
 	// 네트워크 부 헤더 만들기
@@ -515,17 +514,21 @@ void LanServer::CleanupSendBuffer(SESSION* session)
 		//--------------------------------------------------------------------
 		// 송신용 링버퍼에 있는 직렬화 버퍼 Dequeue
 		//--------------------------------------------------------------------
-		SerializationBuffer* packet[SEND_BUFFER_MAX];
+		NetPacket* packetArray[SEND_BUFFER_MAX];
 		int len = size * SEND_BUFFER_MAX;
-		int ret = session->sendQ.Dequeue((char*)packet, len);
+		int ret = session->sendQ.Dequeue((char*)packetArray, len);
 
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼 정리
 		//--------------------------------------------------------------------
 		int packetCount = ret / size;
 		for (int i = 0; i < packetCount; i++)
-			SerializationBuffer::Free(packet[i]);
+		{
+			if (packetArray[i]->DecrementRefCount() == 0)
+				NetPacket::Free(packetArray[i]);
+		}
 	}
+	session->sendBufCount = 0;
 }
 SESSION* LanServer::AcquireSessionLock(DWORD64 sessionID)
 {

@@ -1,39 +1,40 @@
-#ifndef __SERIALIZATIONBUFFER__H_
-#define __SERIALIZATIONBUFFER__H_
+#ifndef __NETPACKET__H_
+#define __NETPACKET__H_
 #include "Base.h"
 #include "ObjectPool.h"
 
 JAYNAMESPACE
 class LanServer;
-class SerializationBuffer
+class NetPacketPtr;
+class NetPacket
 {
 	/**
-	* @file		SerializationBuffer.h
-	* @brief	Network SerializationBuffer Class
+	* @file		NetPacket.h
+	* @brief	Network Packet Class (SerializationBuffer)
 	* @details	네트워크 송수신을 위한 직렬화버퍼 클래스
 	* @author   고재현
-	* @date		2022-11-26
-	* @version  1.0.5
+	* @date		2022-12-03
+	* @version  1.0.6
 	**/
 protected:
-	SerializationBuffer(int bufferSize = 1024);
-	virtual ~SerializationBuffer();
-public:
+	NetPacket(int bufferSize = 1024);
+	virtual ~NetPacket();
+
 	/**
 	* @brief	직렬화 버퍼 할당
 	* @details
 	* @param	void
-	* @return	SerializationBuffer*(직렬화 버퍼 포인터)
+	* @return	NetPacket*(직렬화 버퍼 포인터)
 	**/
-	static SerializationBuffer* Alloc(void);
+	static NetPacket* Alloc(void);
 
 	/**
 	* @brief	직렬화 버퍼 해제
 	* @details
-	* @param	SerializationBuffer*(직렬화 버퍼 포인터)
+	* @param	NetPacket*(직렬화 버퍼 포인터)
 	* @return	void
 	**/
-	static void Free(SerializationBuffer* packet);
+	static void Free(NetPacket* packet);
 public:
 	/**
 	* @brief	버퍼 사이즈 얻기
@@ -164,43 +165,43 @@ protected:
 	**/
 	int DecrementRefCount(void);
 public:
-	SerializationBuffer& operator = (const SerializationBuffer& packet);
+	NetPacket& operator = (const NetPacket& packet);
 
-	SerializationBuffer& operator << (const char value);
-	SerializationBuffer& operator << (const unsigned char value);
+	NetPacket& operator << (const char value);
+	NetPacket& operator << (const unsigned char value);
 
-	SerializationBuffer& operator << (const short value);
-	SerializationBuffer& operator << (const unsigned short value);
+	NetPacket& operator << (const short value);
+	NetPacket& operator << (const unsigned short value);
 
-	SerializationBuffer& operator << (const long value);
-	SerializationBuffer& operator << (const unsigned long value);
+	NetPacket& operator << (const long value);
+	NetPacket& operator << (const unsigned long value);
 
-	SerializationBuffer& operator << (const long long value);
-	SerializationBuffer& operator << (const unsigned long long value);
+	NetPacket& operator << (const long long value);
+	NetPacket& operator << (const unsigned long long value);
 
-	SerializationBuffer& operator << (const int value);
-	SerializationBuffer& operator << (const unsigned int value);
+	NetPacket& operator << (const int value);
+	NetPacket& operator << (const unsigned int value);
 
-	SerializationBuffer& operator << (const float value);
-	SerializationBuffer& operator << (const double value);
+	NetPacket& operator << (const float value);
+	NetPacket& operator << (const double value);
 
-	SerializationBuffer& operator >> (char& value);
-	SerializationBuffer& operator >> (unsigned char& value);
+	NetPacket& operator >> (char& value);
+	NetPacket& operator >> (unsigned char& value);
 
-	SerializationBuffer& operator >> (short& value);
-	SerializationBuffer& operator >> (unsigned short& value);
+	NetPacket& operator >> (short& value);
+	NetPacket& operator >> (unsigned short& value);
 
-	SerializationBuffer& operator >> (long& value);
-	SerializationBuffer& operator >> (unsigned long& value);
+	NetPacket& operator >> (long& value);
+	NetPacket& operator >> (unsigned long& value);
 
-	SerializationBuffer& operator >> (long long& value);
-	SerializationBuffer& operator >> (unsigned long long& value);
+	NetPacket& operator >> (long long& value);
+	NetPacket& operator >> (unsigned long long& value);
 
-	SerializationBuffer& operator >> (int& value);
-	SerializationBuffer& operator >> (unsigned int& value);
+	NetPacket& operator >> (int& value);
+	NetPacket& operator >> (unsigned int& value);
 
-	SerializationBuffer& operator >> (float& value);
-	SerializationBuffer& operator >> (double& value);
+	NetPacket& operator >> (float& value);
+	NetPacket& operator >> (double& value);
 protected:
 	char* _buffer;
 	char* _bufferEnd;
@@ -209,8 +210,9 @@ protected:
 	char* _header;
 	int _bufferSize;
 	long _refCount;
-	static ObjectPool<SerializationBuffer> _packetPool;
-	friend class ObjectPool<SerializationBuffer>;
+	static ObjectPool<NetPacket> _packetPool;
+	friend class ObjectPool<NetPacket>;
+	friend class NetPacketPtr;
 	friend class LanServer;
 };
 JAYNAMESPACEEND

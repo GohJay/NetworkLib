@@ -141,15 +141,17 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="NetPacket.h" />
+    <ClInclude Include="NetPacketPtr.h" />
     <ClInclude Include="ObjectPool.h" />
     <ClInclude Include="Protocol.h" />
-    <ClInclude Include="SerializationBuffer.h" />
     <ClInclude Include="RingBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="SerializationBuffer.cpp" />
+    <ClCompile Include="NetPacket.cpp" />
+    <ClCompile Include="NetPacketPtr.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
