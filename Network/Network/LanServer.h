@@ -3,7 +3,7 @@
 #include "Base.h"
 #include "define.h"
 #include "NetPacketPtr.h"
-#include <stack>
+#include "LockFreeStack.h"
 
 JAYNAMESPACE
 class LanServer
@@ -13,8 +13,8 @@ class LanServer
 	* @brief	Network LanServer Class
 	* @details	내부 네트워크의 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
 	* @author   고재현
-	* @date		2022-11-26
-	* @version  1.0.1
+	* @date		2023-01-12
+	* @version  1.0.2
 	**/
 public:
 	LanServer();
@@ -40,13 +40,14 @@ private:
 	bool Initial();
 	void Release();
 	SESSION* CreateSession(SOCKET socket, const wchar_t* ipaddress, int port);
+	void ReleaseSession(SESSION* session);
 	void DisconnectSession(SESSION* session);
 	void RecvPost(SESSION* session);
 	void SendPost(SESSION* session);
 	void CompleteRecvPacket(SESSION* session);
 	void CompleteSendPacket(SESSION* session);
-	void SendUnicast(SESSION* session, NetPacket* packet);
-	void CleanupSendBuffer(SESSION* session);
+	void TrySendPacket(SESSION* session, NetPacket* packet);
+	void ClearSendPacket(SESSION* session);
 	SESSION* AcquireSessionLock(DWORD64 sessionID);
 	void ReleaseSessionLock(SESSION* session);
 	void MessageProc(UINT message, WPARAM wParam, LPARAM lParam);
@@ -62,8 +63,7 @@ private:
 	WORD _sessionMax;
 	WORD _sessionCnt;
 	DWORD64 _sessionKey;
-	std::stack<WORD> _indexStack;
-	SRWLOCK _indexLock;
+	LockFreeStack<WORD> _indexStack;
 	SOCKET _listenSocket;
 	HANDLE _hCompletionPort;
 	int _workerCreateCnt;

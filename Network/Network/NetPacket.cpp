@@ -1,9 +1,11 @@
 #include "NetPacket.h"
+#include "NetException.h"
+#include "Error.h"
 
-#define PACKET_HEADER_SIZE	10
+#define PACKET_HEADER_SIZE		10
 
 USEJAYNAMESPACE
-ObjectPool<NetPacket> NetPacket::_packetPool(0, false);
+ObjectPool_TLS<NetPacket> NetPacket::_packetPool(0, false);
 NetPacket::NetPacket(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
 {
 	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);
@@ -139,144 +141,216 @@ NetPacket & NetPacket::operator=(const NetPacket & packet)
 }
 NetPacket & NetPacket::operator<<(const char value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const unsigned char value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const short value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const unsigned short value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const long value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const unsigned long value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const long long value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const unsigned long long value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const int value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const unsigned int value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const float value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator<<(const double value)
 {
+	if (GetFreeSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove(_rear, (char*)&value, sizeof(value));
 	MoveRear(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (char &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (unsigned char &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (short & value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (unsigned short &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (long &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (unsigned long &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (long long &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (unsigned long long &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (int &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (unsigned int &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (float &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;
 }
 NetPacket & NetPacket::operator >> (double &value)
 {
+	if (GetUseSize() < sizeof(value))
+		throw NetException(NET_ERROR_NOT_ENOUGH_SPACE);
+
 	memmove((char*)&value, _front, sizeof(value));
 	MoveFront(sizeof(value));
 	return *this;

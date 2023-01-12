@@ -1,7 +1,7 @@
 #ifndef __NETPACKET__H_
 #define __NETPACKET__H_
 #include "Base.h"
-#include "ObjectPool.h"
+#include "../Network/ObjectPool_TLS.h"
 
 JAYNAMESPACE
 class LanServer;
@@ -167,41 +167,41 @@ protected:
 public:
 	NetPacket& operator = (const NetPacket& packet);
 
-	NetPacket& operator << (const char value);
-	NetPacket& operator << (const unsigned char value);
+	NetPacket& operator << (const char value) throw(...);
+	NetPacket& operator << (const unsigned char value) throw(...);
 
-	NetPacket& operator << (const short value);
-	NetPacket& operator << (const unsigned short value);
+	NetPacket& operator << (const short value) throw(...);
+	NetPacket& operator << (const unsigned short value) throw(...);
 
-	NetPacket& operator << (const long value);
-	NetPacket& operator << (const unsigned long value);
+	NetPacket& operator << (const long value) throw(...);
+	NetPacket& operator << (const unsigned long value) throw(...);
 
-	NetPacket& operator << (const long long value);
-	NetPacket& operator << (const unsigned long long value);
+	NetPacket& operator << (const long long value) throw(...);
+	NetPacket& operator << (const unsigned long long value) throw(...);
 
-	NetPacket& operator << (const int value);
-	NetPacket& operator << (const unsigned int value);
+	NetPacket& operator << (const int value) throw(...);
+	NetPacket& operator << (const unsigned int value) throw(...);
 
-	NetPacket& operator << (const float value);
-	NetPacket& operator << (const double value);
+	NetPacket& operator << (const float value) throw(...);
+	NetPacket& operator << (const double value) throw(...);
 
-	NetPacket& operator >> (char& value);
-	NetPacket& operator >> (unsigned char& value);
+	NetPacket& operator >> (char& value) throw(...);
+	NetPacket& operator >> (unsigned char& value) throw(...);
 
-	NetPacket& operator >> (short& value);
-	NetPacket& operator >> (unsigned short& value);
+	NetPacket& operator >> (short& value) throw(...);
+	NetPacket& operator >> (unsigned short& value) throw(...);
 
-	NetPacket& operator >> (long& value);
-	NetPacket& operator >> (unsigned long& value);
+	NetPacket& operator >> (long& value) throw(...);
+	NetPacket& operator >> (unsigned long& value) throw(...);
 
-	NetPacket& operator >> (long long& value);
-	NetPacket& operator >> (unsigned long long& value);
+	NetPacket& operator >> (long long& value) throw(...);
+	NetPacket& operator >> (unsigned long long& value) throw(...);
 
-	NetPacket& operator >> (int& value);
-	NetPacket& operator >> (unsigned int& value);
+	NetPacket& operator >> (int& value) throw(...);
+	NetPacket& operator >> (unsigned int& value) throw(...);
 
-	NetPacket& operator >> (float& value);
-	NetPacket& operator >> (double& value);
+	NetPacket& operator >> (float& value) throw(...);
+	NetPacket& operator >> (double& value) throw(...);
 protected:
 	char* _buffer;
 	char* _bufferEnd;
@@ -210,8 +210,8 @@ protected:
 	char* _header;
 	int _bufferSize;
 	long _refCount;
-	static ObjectPool<NetPacket> _packetPool;
-	friend class ObjectPool<NetPacket>;
+	static ObjectPool_TLS<NetPacket> _packetPool;
+	friend class ObjectPool_TLS<NetPacket>;
 	friend class NetPacketPtr;
 	friend class LanServer;
 };

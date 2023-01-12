@@ -1,17 +1,34 @@
 #include "Logger.h"
-#include <io.h>
-#include <stdio.h>
+#include "FileUtil.h"
+#include <locale.h>
+#include <wchar.h>
+#include <strsafe.h>
 #include <time.h>
-#include "locale.h"
+
+#define LOG_LEVEL_DEBUGW			L"DEBUG"
+#define LOG_LEVEL_SYSTEMW			L"SYSTEM"
+#define LOG_LEVEL_ERRORW			L"ERROR"
+#define LOG_LEVEL_UNKNOWNW			L"UNKNOWN"
+#define LOG_ERROR_BUFFER_TRUNCATED	L"!!! Buffer Truncated !!!"
 
 using namespace Jay;
+
+DWORD Logger::_logIndex;
 int Logger::_logLevel;
+wchar_t Logger::_logPath[MAX_PATH];
+SRWLOCK Logger::_logLock;
 Logger Logger::_instance;
 
 Logger::Logger()
 {
+	//--------------------------------------------------------------------
+	// Initial
+	//--------------------------------------------------------------------
+	_logIndex = 0;
 	_logLevel = LOG_LEVEL_SYSTEM;
+	_logPath[0] = L'\0';
 	setlocale(LC_ALL, "");
+	InitializeSRWLock(&_logLock);
 }
 Logger::~Logger()
 {
@@ -20,31 +37,134 @@ void Logger::SetLogLevel(int logLevel)
 {
 	_logLevel = logLevel;
 }
-void Logger::WriteLog(const wchar_t * tag, int logLevel, const wchar_t * fmt, ...)
+void Logger::SetLogPath(const wchar_t* logPath)
+{
+	wcscpy_s(_logPath, logPath);
+
+	int len = wcslen(_logPath);
+	if (_logPath[len - 1] == L'\\')
+		_logPath[len - 1] = L'\0';
+}
+void Logger::WriteLog(const wchar_t * type, int logLevel, const wchar_t * fmt, ...)
 {
 	if (_logLevel > logLevel)
 		return;
 
-	wchar_t log[512];
-	log[0] = L'\0';
+	wchar_t buffer[256];
+	bool truncated;
+
 	va_list args;
 	va_start(args, fmt);
-	_vsnwprintf_s(log, sizeof(log), fmt, args);
+	HRESULT ret = StringCchVPrintf(buffer, sizeof(buffer) / 2, fmt, args);
 	va_end(args);
+
+	truncated = FAILED(ret);
+
+	//--------------------------------------------------------------------
+	// Write Proc
+	//--------------------------------------------------------------------
+	AcquireSRWLockExclusive(&_logLock);
+	WriteProc(type, logLevel, buffer, truncated);
+	ReleaseSRWLockExclusive(&_logLock);
+}
+void Logger::WriteHex(const wchar_t* type, int logLevel, const wchar_t* log, BYTE* byte, int byteLen)
+{
+	if (_logLevel > logLevel)
+		return;
+
+	wchar_t hex[4];
+	wchar_t buffer[256];
+	bool truncated;
+
+	HRESULT ret = StringCchPrintf(buffer, sizeof(buffer) / 2, L"%s - ", log);
+	for (int i = 0; i < byteLen && SUCCEEDED(ret); i++)
+	{
+		StringCchPrintf(hex, sizeof(hex) / 2, L"%02X", byte[i]);
+		ret = StringCchCat(buffer, sizeof(buffer) / 2, hex);
+	}
+
+	truncated = FAILED(ret);
+
+	//--------------------------------------------------------------------
+	// Write Proc
+	//--------------------------------------------------------------------
+	AcquireSRWLockExclusive(&_logLock);
+	WriteProc(type, logLevel, buffer, truncated);
+	ReleaseSRWLockExclusive(&_logLock);
+}
+void Logger::WriteProc(const wchar_t* type, int logLevel, const wchar_t* buffer, bool truncated)
+{
+	const wchar_t* pLogLevel;
+	switch (logLevel)
+	{
+	case LOG_LEVEL_DEBUG:
+		pLogLevel = LOG_LEVEL_DEBUGW;
+		break;
+	case LOG_LEVEL_SYSTEM:
+		pLogLevel = LOG_LEVEL_SYSTEMW;
+		break;
+	case LOG_LEVEL_ERROR:
+		pLogLevel = LOG_LEVEL_ERRORW;
+		break;
+	default:
+		pLogLevel = LOG_LEVEL_UNKNOWNW;
+		break;
+	}
+
+	if (!ExistFile(_logPath))
+	{
+		if (!MakeDirectory(_logPath))
+			SetLogPath(L".");
+	}
 
 	tm stTime;
 	time_t timer = time(NULL);
 	localtime_s(&stTime, &timer);
-#ifdef _DEBUG
-	wprintf_s(L"[%d/%02d/%02d %02d:%02d:%02d] %s\n", stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec, log);
-#else
+
 	wchar_t logFile[MAX_PATH];
-	swprintf_s(logFile, L"%s_%d-%02d-%02d.log", tag, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday);
+	StringCchPrintf(logFile
+		, MAX_PATH
+		, L"%s\\%d%02d_%s.txt"
+		, _logPath
+		, stTime.tm_year + 1900
+		, stTime.tm_mon + 1
+		, type);
+
+	//--------------------------------------------------------------------
+	// Write File
+	//--------------------------------------------------------------------
 	FILE* pFile;
-	if (_wfopen_s(&pFile, logFile, L"at") != 0)
-		return;
-	fwprintf_s(pFile, L"[%d/%02d/%02d %02d:%02d:%02d] %s\n"
-		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec, log);
-	fclose(pFile);
-#endif // !_DEBUG
+	if (_wfopen_s(&pFile, logFile, L"at") == 0)
+	{
+		fwprintf_s(pFile
+			, L"[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09d] %s\n"
+			, type
+			, stTime.tm_year + 1900
+			, stTime.tm_mon + 1
+			, stTime.tm_mday
+			, stTime.tm_hour
+			, stTime.tm_min
+			, stTime.tm_sec
+			, pLogLevel
+			, ++_logIndex
+			, buffer);
+
+		if (truncated)
+		{
+			fwprintf_s(pFile
+				, L"[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09d] %s\n"
+				, type
+				, stTime.tm_year + 1900
+				, stTime.tm_mon + 1
+				, stTime.tm_mday
+				, stTime.tm_hour
+				, stTime.tm_min
+				, stTime.tm_sec
+				, LOG_LEVEL_ERRORW
+				, _logIndex
+				, LOG_ERROR_BUFFER_TRUNCATED);
+		}
+
+		fclose(pFile);
+	}
 }

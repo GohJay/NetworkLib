@@ -1,10 +1,20 @@
 #ifndef __DEFINE__H
 #define __DEFINE__H
 #include "RingBuffer.h"
+#include "LockFreeQueue.h"
+#include "NetPacket.h"
+
+#define SESSIONID_INDEX_MASK			0x000000000000FFFF
+#define SESSIONID_KEY_MASK				0xFFFFFFFFFFFF0000
+
+#define GET_SESSION_INDEX(sessionid)	((sessionid) & SESSIONID_INDEX_MASK)
+#define MAKE_SESSIONID(key, index)		((key) << 16) | (index)
+
+#define MAX_SENDBUF						500
 
 struct SESSION
 {
-	SESSION() : sessionID(-1)
+	SESSION() : sessionID(-1), ioCount(0), releaseFlag(TRUE)
 	{
 		InitializeSRWLock(&lock);
 	}
@@ -13,13 +23,16 @@ struct SESSION
 	SRWLOCK lock;
 	DWORD64 sessionID;
 	SOCKET socket;
-	wchar_t ip[16];
-	int port;
+	WCHAR ip[16];
+	INT port;
 	LONG ioCount;
 	Jay::RingBuffer recvQ;
-	Jay::RingBuffer sendQ;
+	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
+	Jay::NetPacket* sendBuf[MAX_SENDBUF];
+	LONG sendBufCount;
 	BOOL sendFlag;
-	int sendBufCount;
+	BOOL disconnectFlag;
+	BOOL releaseFlag;
 };
 
 struct TPS

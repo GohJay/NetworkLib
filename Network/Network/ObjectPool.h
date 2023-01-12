@@ -1,16 +1,20 @@
 #ifndef  __OBJECT_POOL__H_
 #define  __OBJECT_POOL__H_
-
-#define SECURE_MODE 1
 #ifdef _WIN64
-#define MEM_GUARD 0xfdfdfdfdfdfdfdfd
-#else
-#define MEM_GUARD 0xfdfdfdfd
-#endif
+
+#define SECURE_MODE					1
+
+#define MAXIMUM_ADDRESS_RANGE		0x00007ffffffeffff
+#define MAXIMUM_ADDRESS_MASK		0x00007fffffffffff
+#define NODE_STAMP_MASK				0xffff800000000000
+#define NODE_STAMP_OFFSET			47
+
+#define GET_NODE_STAMP(node)		(LONG64)((ULONG_PTR)(node) & NODE_STAMP_MASK)
+#define GET_NODE_ADDRESS(node)		(PVOID)((ULONG_PTR)(node) & MAXIMUM_ADDRESS_MASK)
+#define NEXT_NODE_STAMP(basenode)	(LONG64)((((LONG64)(basenode) >> NODE_STAMP_OFFSET) + 1) << NODE_STAMP_OFFSET)
+#define MAKE_NODE(address, stamp)	(PVOID)((ULONG_PTR)(address) | (stamp))
 
 #include <new.h>
-#include <exception>
-#include <synchapi.h>
 
 namespace Jay
 {
@@ -23,8 +27,8 @@ namespace Jay
 				pData 사용
 				MemPool.Free(pData);
 	* @author   고재현
-	* @date		2022-11-26
-	* @version  1.0.3
+	* @date		2022-12-08
+	* @version  1.1.3
 	**/
 	template <typename T>
 	class ObjectPool
@@ -32,16 +36,11 @@ namespace Jay
 	private:
 		struct NODE
 		{
+			T data;
 #if SECURE_MODE
 			size_t signature;
-			size_t underflowGuard;
-			T data;
-			size_t overflowGuard;
-			NODE* prev;
-#else
-			T data;
-			NODE* prev;
 #endif
+			NODE* prev;
 		};
 	public:
 		/**
@@ -51,33 +50,42 @@ namespace Jay
 		* @return	
 		**/
 		ObjectPool(int blockNum, bool placementNew = false) 
-			: _top(nullptr), _placementNew(placementNew), _capacity(blockNum), _useCount(0)
+			: _top(nullptr), _placementNew(placementNew), _capacity(0), _useCount(0)
 		{
-			InitializeSRWLock(&_poolLock);
+			NODE* node; 
+			LONG64 nodeStamp;
 			while (blockNum > 0)
 			{
-				NODE* block = (NODE*)malloc(sizeof(NODE));
+				node = (NODE*)malloc(sizeof(NODE));
+				node->prev = (NODE*)GET_NODE_ADDRESS(_top);
 #if SECURE_MODE
-				block->signature = (size_t)this;
-				block->underflowGuard = MEM_GUARD;
-				block->overflowGuard = MEM_GUARD;
+				node->signature = (size_t)this;
+				_capacity++;
 #endif
-				block->prev = _top;
 				if (!_placementNew)
-					new(&block->data) T();
-				_top = block;
+					new(&node->data) T();
+
+				nodeStamp = NEXT_NODE_STAMP(_top);
+				_top = (NODE*)MAKE_NODE(node, nodeStamp);
+
 				blockNum--;
 			}
 		}
 		~ObjectPool()
 		{
+			NODE* prev;
+			_top = (NODE*)GET_NODE_ADDRESS(_top);
 			while (_top)
 			{
-				NODE* prev = _top->prev;
 				if (!_placementNew)
 					_top->data.~T();
+
+				prev = _top->prev;
 				free(_top);
 				_top = prev;
+#if SECURE_MODE
+				_capacity--;
+#endif
 			}
 		}
 	public:
@@ -89,30 +97,36 @@ namespace Jay
 		**/
 		T* Alloc(void)
 		{
-			AcquireSRWLockExclusive(&_poolLock);
-			NODE* block;
-			if (_top == nullptr)
+			NODE* top;
+			NODE* prev;
+			NODE* node;
+			LONG64 nodeStamp;
+
+			do
 			{
-				block = (NODE*)malloc(sizeof(NODE));
+				top = _top;
+				node = (NODE*)GET_NODE_ADDRESS(top);
+				if (node == nullptr)
+				{
+					node = (NODE*)malloc(sizeof(NODE));
+					new(&node->data) T();
 #if SECURE_MODE
-				block->signature = (size_t)this;
-				block->underflowGuard = MEM_GUARD;
-				block->overflowGuard = MEM_GUARD;
+					node->signature = (size_t)this;
+					InterlockedIncrement(&_capacity);
+					InterlockedIncrement(&_useCount);
 #endif
-				block->prev = _top;
-				new(&block->data) T();
-			}
-			else
-			{
-				block = _top;
-				if (_placementNew)
-					new(&block->data) T();
-				_top = _top->prev;
-				_capacity--;
-			}
-			_useCount++;
-			ReleaseSRWLockExclusive(&_poolLock);
-			return &block->data;
+					return &node->data;
+				}
+				nodeStamp = GET_NODE_STAMP(top);
+				prev = (NODE*)MAKE_NODE(node->prev, nodeStamp);
+			} while (InterlockedCompareExchangePointer((PVOID*)&_top, prev, top) != top);
+
+			if (_placementNew)
+				new(&node->data) T();
+#if SECURE_MODE
+			InterlockedIncrement(&_useCount);
+#endif
+			return &node->data;
 		}
 		
 		/**
@@ -121,30 +135,32 @@ namespace Jay
 		* @param	T*(데이터 블럭 포인터)
 		* @return	void
 		**/
-#if SECURE_MODE
 		void Free(T* data) throw(...)
 		{
-			AcquireSRWLockExclusive(&_poolLock);
-			NODE* block = (NODE*)((char*)data - sizeof(size_t) - sizeof(size_t));
-			if (block->signature != (size_t)this)
-				throw std::exception("Incorrect signature");
-			if (block->underflowGuard != MEM_GUARD)
-				throw std::exception("Memory underflow");
-			if (block->overflowGuard != MEM_GUARD)
-				throw std::exception("Memory overflow");
-#else
-		void Free(T* data)
-		{
-			AcquireSRWLockExclusive(&_poolLock);
-			NODE* block = (NODE*)data;
+			NODE* node;
+			NODE* top;
+			NODE* prev;
+			LONG64 nodeStamp;
+
+			node = (NODE*)data;
+#if SECURE_MODE
+			if (node->signature != (size_t)this)
+				throw;
 #endif
 			if (_placementNew)
-				block->data.~T();
-			block->prev = _top;
-			_top = block;
-			_useCount--;
-			_capacity++;
-			ReleaseSRWLockExclusive(&_poolLock);
+				node->data.~T();
+
+			do
+			{
+				top = _top;
+				node->prev = (NODE*)GET_NODE_ADDRESS(top);
+				nodeStamp = NEXT_NODE_STAMP(top);
+				prev = (NODE*)MAKE_NODE(node, nodeStamp);
+			} while (InterlockedCompareExchangePointer((PVOID*)&_top, prev, top) != top);
+
+#if SECURE_MODE
+			InterlockedDecrement(&_useCount);
+#endif
 		}
 		
 		/**
@@ -153,7 +169,10 @@ namespace Jay
 		* @param	void
 		* @return	int(메모리 풀 내부 전체 블럭 개수)
 		**/
-		int GetCapacityCount(void) { return _capacity; }
+		inline int GetCapacityCount(void)
+		{
+			return _capacity;
+		}
 
 		/**
 		* @brief	현재 사용중인 블럭 개수를 얻는다.
@@ -161,13 +180,17 @@ namespace Jay
 		* @param	void
 		* @return	int(사용중인 블럭 개수)
 		**/
-		int GetUseCount(void) { return _useCount; }
+		inline int GetUseCount(void)
+		{
+			return _useCount;
+		}
 	private:
 		NODE* _top;
 		bool _placementNew;
-		int _capacity;
-		int _useCount;
-		SRWLOCK _poolLock;
+		long _capacity;
+		long _useCount;
 	};
 }
-#endif
+
+#endif //!_WIN64
+#endif //!__OBJECT_POOL__H_

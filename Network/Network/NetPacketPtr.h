@@ -23,41 +23,41 @@ public:
 public:
 	inline NetPacket* operator ->();
 
-	inline NetPacketPtr& operator << (const char value);
-	inline NetPacketPtr& operator << (const unsigned char value);
+	inline NetPacketPtr& operator << (const char value) throw(...);
+	inline NetPacketPtr& operator << (const unsigned char value) throw(...);
 
-	inline NetPacketPtr& operator << (const short value);
-	inline NetPacketPtr& operator << (const unsigned short value);
+	inline NetPacketPtr& operator << (const short value) throw(...);
+	inline NetPacketPtr& operator << (const unsigned short value) throw(...);
 
-	inline NetPacketPtr& operator << (const long value);
-	inline NetPacketPtr& operator << (const unsigned long value);
+	inline NetPacketPtr& operator << (const long value) throw(...);
+	inline NetPacketPtr& operator << (const unsigned long value) throw(...);
 
-	inline NetPacketPtr& operator << (const long long value);
-	inline NetPacketPtr& operator << (const unsigned long long value);
+	inline NetPacketPtr& operator << (const long long value) throw(...);
+	inline NetPacketPtr& operator << (const unsigned long long value) throw(...);
 
-	inline NetPacketPtr& operator << (const int value);
-	inline NetPacketPtr& operator << (const unsigned int value);
+	inline NetPacketPtr& operator << (const int value) throw(...);
+	inline NetPacketPtr& operator << (const unsigned int value) throw(...);
 
-	inline NetPacketPtr& operator << (const float value);
-	inline NetPacketPtr& operator << (const double value);
+	inline NetPacketPtr& operator << (const float value) throw(...);
+	inline NetPacketPtr& operator << (const double value) throw(...);
 
-	inline NetPacketPtr& operator >> (char& value);
-	inline NetPacketPtr& operator >> (unsigned char& value);
+	inline NetPacketPtr& operator >> (char& value) throw(...);
+	inline NetPacketPtr& operator >> (unsigned char& value) throw(...);
 
-	inline NetPacketPtr& operator >> (short& value);
-	inline NetPacketPtr& operator >> (unsigned short& value);
+	inline NetPacketPtr& operator >> (short& value) throw(...);
+	inline NetPacketPtr& operator >> (unsigned short& value) throw(...);
 
-	inline NetPacketPtr& operator >> (long& value);
-	inline NetPacketPtr& operator >> (unsigned long& value);
+	inline NetPacketPtr& operator >> (long& value) throw(...);
+	inline NetPacketPtr& operator >> (unsigned long& value) throw(...);
 
-	inline NetPacketPtr& operator >> (long long& value);
-	inline NetPacketPtr& operator >> (unsigned long long& value);
+	inline NetPacketPtr& operator >> (long long& value) throw(...);
+	inline NetPacketPtr& operator >> (unsigned long long& value) throw(...);
 
-	inline NetPacketPtr& operator >> (int& value);
-	inline NetPacketPtr& operator >> (unsigned int& value);
+	inline NetPacketPtr& operator >> (int& value) throw(...);
+	inline NetPacketPtr& operator >> (unsigned int& value) throw(...);
 
-	inline NetPacketPtr& operator >> (float& value);
-	inline NetPacketPtr& operator >> (double& value);
+	inline NetPacketPtr& operator >> (float& value) throw(...);
+	inline NetPacketPtr& operator >> (double& value) throw(...);
 private:
 	inline NetPacket* operator *();
 private:

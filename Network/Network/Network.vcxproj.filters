@@ -54,6 +54,30 @@
     <ClInclude Include="NetPacketPtr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="User.h">
+      <Filter>Base</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectPool_TLS.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="FileUtil.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="LockFreeQueue.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="LockFreeStack.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Enviroment.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="NetException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Exception.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
@@ -70,6 +94,9 @@
     </ClCompile>
     <ClCompile Include="NetPacketPtr.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileUtil.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
