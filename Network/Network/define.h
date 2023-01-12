@@ -14,25 +14,30 @@
 
 struct SESSION
 {
-	SESSION() : sessionID(-1), ioCount(0), releaseFlag(TRUE)
+	SESSION() : releaseFlag(TRUE), ioCount(0), sessionID(-1)
 	{
-		InitializeSRWLock(&lock);
 	}
+	union
+	{
+		struct
+		{
+			BOOL releaseFlag;
+			LONG ioCount;
+		};
+		LONGLONG release;
+	};
 	OVERLAPPED recvOverlapped;
 	OVERLAPPED sendOverlapped;
-	SRWLOCK lock;
 	DWORD64 sessionID;
 	SOCKET socket;
 	WCHAR ip[16];
 	INT port;
-	LONG ioCount;
 	Jay::RingBuffer recvQ;
 	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
 	Jay::NetPacket* sendBuf[MAX_SENDBUF];
 	LONG sendBufCount;
 	BOOL sendFlag;
 	BOOL disconnectFlag;
-	BOOL releaseFlag;
 };
 
 struct TPS

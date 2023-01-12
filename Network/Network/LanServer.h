@@ -42,15 +42,16 @@ private:
 	SESSION* CreateSession(SOCKET socket, const wchar_t* ipaddress, int port);
 	void ReleaseSession(SESSION* session);
 	void DisconnectSession(SESSION* session);
+	SESSION* DuplicateSession(DWORD64 sessionID);
+	void CloseSession(SESSION* session);
 	void RecvPost(SESSION* session);
 	void SendPost(SESSION* session);
 	void CompleteRecvPacket(SESSION* session);
 	void CompleteSendPacket(SESSION* session);
 	void TrySendPacket(SESSION* session, NetPacket* packet);
 	void ClearSendPacket(SESSION* session);
-	SESSION* AcquireSessionLock(DWORD64 sessionID);
-	void ReleaseSessionLock(SESSION* session);
-	void MessageProc(UINT message, WPARAM wParam, LPARAM lParam);
+	void MessagePost(DWORD message, LPVOID lpParam);
+	void MessageProc(DWORD message, LPVOID lpParam);
 private:
 	unsigned int AcceptThread();
 	unsigned int WorkerThread();

@@ -85,25 +85,23 @@ void LanServer::Stop()
 }
 bool LanServer::Disconnect(DWORD64 sessionID)
 {
-	SESSION* session = AcquireSessionLock(sessionID);
-	if (session != nullptr)
-	{
-		DisconnectSession(session);
-		ReleaseSessionLock(session);
-		return true;
-	}
+	SESSION* session = DuplicateSession(sessionID);
+	if (session == nullptr)
+		return false;
+
+	DisconnectSession(session);
+	CloseSession(session);
 	return true;
 }
 bool LanServer::SendPacket(DWORD64 sessionID, NetPacketPtr packet)
 {
-	SESSION* session = AcquireSessionLock(sessionID);
-	if (session != nullptr)
-	{
-		TrySendPacket(session, *packet);
-		ReleaseSessionLock(session);
-		return true;
-	}
-	return false;
+	SESSION* session = DuplicateSession(sessionID);
+	if (session == nullptr)
+		return false;
+
+	TrySendPacket(session, *packet);
+	CloseSession(session);
+	return true;
 }
 int LanServer::GetSessionCount()
 {
@@ -249,11 +247,12 @@ SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int p
 	}
 
 	SESSION* session = &_sessionArray[index];
+	InterlockedIncrement(&session->ioCount);
+
 	session->sessionID = MAKE_SESSIONID(++_sessionKey, index);
 	session->socket = socket;
 	wcscpy_s(session->ip, ipaddress);
 	session->port = port;
-	session->ioCount = 0;
 	session->recvQ.ClearBuffer();
 	session->sendBufCount = 0;
 	session->sendFlag = FALSE;
@@ -265,16 +264,19 @@ SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int p
 }
 void LanServer::ReleaseSession(SESSION* session)
 {
-	WORD index = GET_SESSION_INDEX(session->sessionID);
-
-	AcquireSRWLockExclusive(&session->lock);
-	session->releaseFlag = TRUE;
-	ReleaseSRWLockExclusive(&session->lock);
+	//--------------------------------------------------------------------
+	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
+	//--------------------------------------------------------------------
+	if (InterlockedCompareExchange64(&session->release, TRUE, FALSE) != FALSE)
+		return;
 
 	ClearSendPacket(session);
 	OnClientLeave(session->sessionID);
 
 	closesocket(session->socket);
+	session->socket = INVALID_SOCKET;
+
+	WORD index = GET_SESSION_INDEX(session->sessionID);
 	_indexStack.Push(index);
 
 	InterlockedDecrement16((SHORT*)&_sessionCnt);
@@ -286,6 +288,46 @@ void LanServer::DisconnectSession(SESSION* session)
 	//--------------------------------------------------------------------
 	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == TRUE)
 		CancelIoEx((HANDLE)session->socket, NULL);
+}
+SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
+{
+	WORD index = GET_SESSION_INDEX(sessionID);
+	SESSION* session = &_sessionArray[index];
+	InterlockedIncrement(&session->ioCount);
+
+	do
+	{
+		//--------------------------------------------------------------------
+		// 릴리즈된 세션인지 확인
+		//--------------------------------------------------------------------
+		if (session->releaseFlag == TRUE)
+			break;
+
+		//--------------------------------------------------------------------
+		// 재사용된 세션인지 확인
+		//--------------------------------------------------------------------
+		if (session->sessionID != sessionID)
+			break;
+
+		//--------------------------------------------------------------------
+		// 세션 찾기 성공
+		//--------------------------------------------------------------------
+		return session;
+	} while (0);
+
+	//--------------------------------------------------------------------
+	// 세션 찾기 실패
+	//--------------------------------------------------------------------
+	CloseSession(session);
+	return nullptr;
+}
+void LanServer::CloseSession(SESSION* session)
+{
+	//--------------------------------------------------------------------
+	// 참조 세션 반환
+	//--------------------------------------------------------------------
+	if (InterlockedDecrement(&session->ioCount) == 0)
+		ReleaseSession(session);
 }
 void LanServer::RecvPost(SESSION* session)
 {
@@ -539,9 +581,10 @@ void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	session->sendQ.Enqueue(packet);
 
 	//--------------------------------------------------------------------
-	// 송신 시도
+	// 송신 요청
 	//--------------------------------------------------------------------
-	SendPost(session);
+	MessagePost(UM_SEND_PACKET, (LPVOID)session->sessionID);
+	//SendPost(session);
 }
 void LanServer::ClearSendPacket(SESSION* session)
 {
@@ -568,37 +611,28 @@ void LanServer::ClearSendPacket(SESSION* session)
 			NetPacket::Free(packet);
 	}
 }
-SESSION* LanServer::AcquireSessionLock(DWORD64 sessionID)
-{
-	WORD index = GET_SESSION_INDEX(sessionID);
-	SESSION* session = &_sessionArray[index];
-	AcquireSRWLockExclusive(&session->lock);
-	if (session->releaseFlag == TRUE || session->sessionID != sessionID)
-	{
-		ReleaseSRWLockExclusive(&session->lock);
-		return nullptr;
-	}
-	return session;
-}
-void LanServer::ReleaseSessionLock(SESSION* session)
-{
-	ReleaseSRWLockExclusive(&session->lock);
-}
-void LanServer::MessageProc(UINT message, WPARAM wParam, LPARAM lParam)
+void LanServer::MessagePost(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
-	// 다른 스레드에서 WorkerThread 에 보낸 메시지 처리
+	// WorkerThread 에게 Job 요청
+	//--------------------------------------------------------------------
+	PostQueuedCompletionStatus(_hCompletionPort, message, (ULONG_PTR)lpParam, NULL);
+}
+void LanServer::MessageProc(DWORD message, LPVOID lpParam)
+{
+	//--------------------------------------------------------------------
+	// 다른 스레드로부터 요청받은 Job 처리
 	//--------------------------------------------------------------------
 	switch (message)
 	{
 		case UM_SEND_PACKET:
 		{
-			DWORD64 sessionID = wParam;
-			SESSION* session = AcquireSessionLock(sessionID);
+			DWORD64 sessionID = (DWORD64)lpParam;
+			SESSION* session = DuplicateSession(sessionID);
 			if (session != nullptr)
 			{
 				SendPost(session);
-				ReleaseSessionLock(session);
+				CloseSession(session);
 			}
 		}
 		break;
@@ -658,13 +692,15 @@ unsigned int LanServer::AcceptThread()
 		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
-		// 신규 접속자의 정보를 컨텐츠 부에 알림
+		// 신규 접속자의 정보를 컨텐츠 부에 알리고 수신 등록
 		//--------------------------------------------------------------------
-		InterlockedIncrement(&session->ioCount);
 		OnClientJoin(session->sessionID);
 		RecvPost(session);
-		if (InterlockedDecrement(&session->ioCount) == 0)
-			ReleaseSession(session);
+
+		//--------------------------------------------------------------------
+		// AcceptThread 에서 참조하던 세션 반환
+		//--------------------------------------------------------------------
+		CloseSession(session);
 
 		InterlockedIncrement(&_monitoring.curTPS.accept);
 	}
@@ -731,7 +767,7 @@ unsigned int LanServer::WorkerThread()
 			else
 			{
 				// 다른 스레드에서 WorkerThread 에 보낸 메시지 처리
-				MessageProc(cbTransferred, (WPARAM)session, (LPARAM)overlapped);
+				MessageProc(cbTransferred, (LPVOID)session);
 				continue;
 			}
 		}
