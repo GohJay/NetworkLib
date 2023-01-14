@@ -56,12 +56,12 @@ namespace Jay
                 tailNode = _tail;
                 tail = (NODE*)GET_NODE_ADDRESS(tailNode);
                 tailNext = tail->next;
-                nodeStamp = NEXT_NODE_STAMP(tailNode);
 
                 if (tailNext == nullptr)
                 {
                     if (InterlockedCompareExchangePointer((PVOID*)&tail->next, node, tailNext) == tailNext)
                     {
+                        nodeStamp = NEXT_NODE_STAMP(tailNode);
                         nextNode = (NODE*)MAKE_NODE(node, nodeStamp);
                         InterlockedCompareExchangePointer((PVOID*)&_tail, nextNode, tailNode);
                         break;
@@ -69,6 +69,7 @@ namespace Jay
                 }
                 else
                 {
+                    nodeStamp = NEXT_NODE_STAMP(tailNode);
                     nextNode = (NODE*)MAKE_NODE(tailNext, nodeStamp);
                     InterlockedCompareExchangePointer((PVOID*)&_tail, nextNode, tailNode);
                 }
@@ -95,11 +96,12 @@ namespace Jay
                 headNode = _head;
                 head = (NODE*)GET_NODE_ADDRESS(headNode);
                 headNext = head->next;
-                nodeStamp = NEXT_NODE_STAMP(headNode);
-                nextNode = (NODE*)MAKE_NODE(headNext, nodeStamp);
 
                 if (headNext == nullptr)
                     continue;
+
+                nodeStamp = NEXT_NODE_STAMP(headNode);
+                nextNode = (NODE*)MAKE_NODE(headNext, nodeStamp);
 
                 if (headNode == _tail)
                     InterlockedCompareExchangePointer((PVOID*)&_tail, nextNode, headNode);
@@ -112,11 +114,11 @@ namespace Jay
             _nodePool.Free(head);
             return true;
         }
-        int size()
+        inline int size()
         {
             return _count;
         }
-        int empty()
+        inline int empty()
         {
             return _count <= 0;
         }

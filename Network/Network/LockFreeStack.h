@@ -79,11 +79,11 @@ namespace Jay
 
             return true;
         }
-        int size()
+        inline int size()
         {
             return _count;
         }
-        int empty()
+        inline int empty()
         {
             return _count <= 0;
         }

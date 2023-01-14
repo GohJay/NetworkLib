@@ -10,20 +10,20 @@ bool Jay::ExistFile(const wchar_t* filepath)
 }
 bool Jay::MakeDirectory(const wchar_t* filepath)
 {
+	if (wcscmp(filepath, L"") == 0 || wcscmp(filepath, L".") == 0)
+		return true;
+
+	if (ExistFile(filepath))
+		return true;
+
 	wchar_t parentpath[MAX_PATH];
+	if (GetParentDirectory(filepath, parentpath))
+		MakeDirectory(parentpath);
 
-	if (!ExistFile(filepath))
-	{
-		if (GetParentDirectory(filepath, parentpath))
-		{
-			if (!MakeDirectory(parentpath))
-				return false;
-		}
+	if (CreateDirectory(filepath, NULL))
+		return true;
 
-		if (!CreateDirectory(filepath, NULL))
-			return false;
-	}
-	return true;
+	return false;
 }
 bool Jay::GetParentDirectory(const wchar_t* filepath, wchar_t* parentpath)
 {

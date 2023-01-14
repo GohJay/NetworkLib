@@ -1,24 +1,30 @@
 #ifndef __NET_EXCEPTION__H_
 #define __NET_EXCEPTION__H_
-#include "Exception.h"
+#include "Base.h"
+#include <exception>
 
-namespace Jay
+JAYNAMESPACE
+class NetException : public std::exception
 {
-	class NetException : public Exception
+public:
+	NetException(int error) : _error(error)
 	{
-	public:
-		NetException(int error) : Exception(error)
-		{
-		}
-		~NetException()
-		{
-		}
-	public:
-		virtual const char* what() const
-		{
-			return "Network Exception";
-		}
-	};
-}
+	}
+	~NetException()
+	{
+	}
+public:
+	int GetLastError()
+	{
+		return _error;
+	}
+	virtual const char* what() const
+	{
+		return "Network Exception";
+	}
+private:
+	int _error;
+};
+JAYNAMESPACEEND
 
 #endif

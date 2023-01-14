@@ -4,15 +4,13 @@
 
 namespace Jay
 {
-	inline
-		size_t GetMaximumUserAddress()
+	inline size_t GetMaximumUserAddress()
 	{
 		SYSTEM_INFO systemInfo;
 		GetSystemInfo(&systemInfo);
 		return (size_t)systemInfo.lpMaximumApplicationAddress;
 	}
-	inline
-		size_t GetMinimumKernelAddress()
+	inline size_t GetMinimumKernelAddress()
 	{
 		return ~GetMaximumUserAddress();
 	}

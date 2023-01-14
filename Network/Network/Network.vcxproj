@@ -140,7 +140,6 @@
     <ClInclude Include="define.h" />
     <ClInclude Include="Enviroment.h" />
     <ClInclude Include="Error.h" />
-    <ClInclude Include="Exception.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
