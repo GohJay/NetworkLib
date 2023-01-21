@@ -1,10 +1,10 @@
 #include "NetPacketPtr.h"
 
-USEJAYNAMESPACE
+using namespace Jay;
+
 NetPacketPtr::NetPacketPtr()
 {
 	_packet = NetPacket::Alloc();
-	_packet->_refCount = 1;
 }
 NetPacketPtr::NetPacketPtr(const NetPacketPtr& ref)
 {
@@ -20,6 +20,5 @@ NetPacketPtr& NetPacketPtr::operator=(const NetPacketPtr& ref)
 }
 NetPacketPtr::~NetPacketPtr()
 {
-	if (_packet->DecrementRefCount() == 0)
-		NetPacket::Free(_packet);
+	NetPacket::Free(_packet);
 }

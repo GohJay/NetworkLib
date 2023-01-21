@@ -1,6 +1,7 @@
 #include "RingBuffer.h"
 
-USEJAYNAMESPACE
+using namespace Jay;
+
 RingBuffer::RingBuffer(int bufferSize) : _bufferSize(bufferSize)
 {
 	_buffer = (char*)malloc(_bufferSize);
@@ -45,6 +46,10 @@ int RingBuffer::DirectDequeueSize(void)
 		return diff;
 	else
 		return _bufferEnd - front;
+}
+int RingBuffer::GetBufferSize(void)
+{
+	return _bufferSize;
 }
 int RingBuffer::Enqueue(const char * input, int size)
 {

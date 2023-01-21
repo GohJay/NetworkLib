@@ -137,13 +137,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Base.h" />
-    <ClInclude Include="define.h" />
+    <ClInclude Include="Define.h" />
     <ClInclude Include="Enviroment.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
     <ClInclude Include="NetException.h" />
+    <ClInclude Include="NetServer.h" />
     <ClInclude Include="ObjectPool_TLS.h" />
     <ClInclude Include="User.h" />
     <ClInclude Include="LanServer.h" />
@@ -160,6 +161,7 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="NetPacket.cpp" />
     <ClCompile Include="NetPacketPtr.cpp" />
+    <ClCompile Include="NetServer.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

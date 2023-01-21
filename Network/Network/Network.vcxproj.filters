@@ -36,7 +36,7 @@
     <ClInclude Include="Protocol.h">
       <Filter>Base</Filter>
     </ClInclude>
-    <ClInclude Include="define.h">
+    <ClInclude Include="Define.h">
       <Filter>Base</Filter>
     </ClInclude>
     <ClInclude Include="ObjectPool.h">
@@ -75,6 +75,9 @@
     <ClInclude Include="NetException.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NetServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
@@ -94,6 +97,9 @@
     </ClCompile>
     <ClCompile Include="FileUtil.cpp">
       <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="NetServer.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

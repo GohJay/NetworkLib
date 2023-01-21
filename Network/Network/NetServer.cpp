@@ -1,4 +1,4 @@
-#include "LanServer.h"
+#include "NetServer.h"
 #include "Error.h"
 #include "Protocol.h"
 #include "User.h"
@@ -13,7 +13,7 @@
 
 using namespace Jay;
 
-LanServer::LanServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _totalAcceptCnt(0)
+NetServer::NetServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _totalAcceptCnt(0)
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
@@ -23,11 +23,11 @@ LanServer::LanServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _t
 		return;
 	}
 }
-LanServer::~LanServer()
+NetServer::~NetServer()
 {
 	WSACleanup();
 }
-bool LanServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, int timeoutSec, bool nagle)
+bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, int timeoutSec, bool nagle)
 {
 	_workerCreateCnt = workerCreateCnt;
 	_workerRunningCnt = workerRunningCnt;
@@ -61,7 +61,7 @@ bool LanServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 
 	return true;
 }
-void LanServer::Stop()
+void NetServer::Stop()
 {
 	//--------------------------------------------------------------------
 	// AcceptThread, ManagementThread 종료 신호 보내기
@@ -112,7 +112,7 @@ void LanServer::Stop()
 	//--------------------------------------------------------------------
 	Release();
 }
-bool LanServer::Disconnect(DWORD64 sessionID)
+bool NetServer::Disconnect(DWORD64 sessionID)
 {
 	SESSION* session = DuplicateSession(sessionID);
 	if (session != nullptr)
@@ -123,7 +123,7 @@ bool LanServer::Disconnect(DWORD64 sessionID)
 	}
 	return false;
 }
-bool LanServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
+bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
 {
 	SESSION* session = DuplicateSession(sessionID);
 	if (session != nullptr)
@@ -134,31 +134,31 @@ bool LanServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
 	}
 	return false;
 }
-int LanServer::GetSessionCount()
+int NetServer::GetSessionCount()
 {
 	return _sessionCnt;
 }
-int LanServer::GetUsePacketCount()
+int NetServer::GetUsePacketCount()
 {
 	return NetPacket::_packetPool.GetUseCount();
 }
-int LanServer::GetTotalAcceptCount()
+int NetServer::GetTotalAcceptCount()
 {
 	return _totalAcceptCnt;
 }
-int LanServer::GetAcceptTPS()
+int NetServer::GetAcceptTPS()
 {
 	return _oldTPS.accept;
 }
-int LanServer::GetRecvTPS()
+int NetServer::GetRecvTPS()
 {
 	return _oldTPS.recv;
 }
-int LanServer::GetSendTPS()
+int NetServer::GetSendTPS()
 {
 	return _oldTPS.send;
 }
-SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
+SESSION* NetServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
 	WORD index;
 	if (!_indexStack.Pop(index))
@@ -184,7 +184,7 @@ SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int p
 	InterlockedIncrement16((SHORT*)&_sessionCnt);
 	return session;
 }
-void LanServer::ReleaseSession(SESSION* session)
+void NetServer::ReleaseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
@@ -208,7 +208,7 @@ void LanServer::ReleaseSession(SESSION* session)
 
 	InterlockedDecrement16((SHORT*)&_sessionCnt);
 }
-void LanServer::DisconnectSession(SESSION* session)
+void NetServer::DisconnectSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 소켓에 현재 요청되어있는 모든 IO 를 중단
@@ -216,7 +216,7 @@ void LanServer::DisconnectSession(SESSION* session)
 	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == FALSE)
 		CancelIoEx((HANDLE)session->socket, NULL);
 }
-SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
+SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
 {
 	WORD index = GET_SESSION_INDEX(sessionID);
 	SESSION* session = &_sessionArray[index];
@@ -248,7 +248,7 @@ SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
 
 	return nullptr;
 }
-void LanServer::CloseSession(SESSION* session)
+void NetServer::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 참조 세션 반환
@@ -256,7 +256,7 @@ void LanServer::CloseSession(SESSION* session)
 	if (InterlockedDecrement(&session->ioCount) == 0)
 		ReleaseSession(session);
 }
-void LanServer::RecvPost(SESSION* session)
+void NetServer::RecvPost(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// Disconnect Flag 가 켜져있을 경우 return
@@ -280,18 +280,19 @@ void LanServer::RecvPost(SESSION* session)
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
 	ZeroMemory(&session->recvOverlapped, sizeof(session->recvOverlapped));
-	WSABUF wsaRecvBuf[2];
-	wsaRecvBuf[0].buf = session->recvQ.GetRearBufferPtr();
-	wsaRecvBuf[0].len = directSize;
-	wsaRecvBuf[1].len = session->recvQ.GetFreeSize() - directSize;
-	wsaRecvBuf[1].buf = session->recvQ.GetBufferPtr();
+	WSABUF wsaBuf[2];
+
+	wsaBuf[0].len = directSize;
+	wsaBuf[0].buf = session->recvQ.GetRearBufferPtr();
+	wsaBuf[1].len = session->recvQ.GetFreeSize() - directSize;
+	wsaBuf[1].buf = session->recvQ.GetBufferPtr();
 
 	//--------------------------------------------------------------------
 	// WSARecv 처리
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -320,7 +321,7 @@ void LanServer::RecvPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
 	}
 }
-void LanServer::SendPost(SESSION* session)
+void NetServer::SendPost(SESSION* session)
 {
 	for (;;)
 	{
@@ -389,7 +390,7 @@ void LanServer::SendPost(SESSION* session)
 				break;
 			}
 
-			// ioCount가 0이라면 연결 끊기
+			// ioCount가 0이라면 세션 정리
 			if (InterlockedDecrement(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
@@ -402,23 +403,23 @@ void LanServer::SendPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
 	}
 }
-void LanServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
+void NetServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
 {
 	session->lastRecvTime = timeGetTime();
 	session->recvQ.MoveRear(cbTransferred);
 	CompleteRecvPacket(session);
 	RecvPost(session);
 }
-void LanServer::SendRoutine(SESSION* session, DWORD cbTransferred)
+void NetServer::SendRoutine(SESSION* session, DWORD cbTransferred)
 {
 	CompleteSendPacket(session);
 	InterlockedExchange((LONG*)&session->sendFlag, FALSE);
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
-void LanServer::CompleteRecvPacket(SESSION* session)
+void NetServer::CompleteRecvPacket(SESSION* session)
 {
-	LAN_PACKET_HEADER header;
+	NET_PACKET_HEADER header;
 	for (;;)
 	{
 		//--------------------------------------------------------------------
@@ -436,6 +437,15 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		{
 			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, sizeof(header), ret);
 			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+			DisconnectSession(session);
+			break;
+		}
+
+		//--------------------------------------------------------------------
+		// 패킷 코드 진위 여부 확인
+		//--------------------------------------------------------------------
+		if (header.code != PACKET_CODE)
+		{
 			DisconnectSession(session);
 			break;
 		}
@@ -467,6 +477,17 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 			break;
 		}
 		packet->MoveRear(ret);
+		
+		//--------------------------------------------------------------------
+		// 직렬화 버퍼 디코딩 처리
+		//--------------------------------------------------------------------
+		if (!packet->Decode())
+		{
+			OnError(NET_ERROR_DECRYPTION_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+			DisconnectSession(session);
+			NetPacket::Free(packet);
+			break;
+		}
 
 		try
 		{
@@ -480,14 +501,14 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 			OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			DisconnectSession(session);
 			NetPacket::Free(packet);
-			return;
+			break;
 		}
 
 		NetPacket::Free(packet);
 		InterlockedIncrement(&_curTPS.recv);
 	}
 }
-void LanServer::CompleteSendPacket(SESSION* session)
+void NetServer::CompleteSendPacket(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 전송 완료한 직렬화 버퍼 정리
@@ -503,7 +524,7 @@ void LanServer::CompleteSendPacket(SESSION* session)
 	InterlockedAdd(&_curTPS.send, session->sendBufCount);
 	session->sendBufCount = 0;
 }
-void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
+void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 {
 	int size = session->sendQ.size();
 	if (size > MAX_SENDBUF)
@@ -515,11 +536,9 @@ void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	}
 
 	//--------------------------------------------------------------------
-	// 직렬화 버퍼에 네트워크 부 헤더 담기
+	// 직렬화 버퍼 인코딩 처리
 	//--------------------------------------------------------------------
-	LAN_PACKET_HEADER header;
-	header.len = packet->GetUseSize();
-	packet->PutHeader((char*)&header, sizeof(header));
+	packet->Encode();
 
 	//--------------------------------------------------------------------
 	// 송신용 큐에 직렬화 버퍼 담기
@@ -531,19 +550,19 @@ void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	// 송신 요청
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
-	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session->sessionID);
+	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
-void LanServer::ClearSendPacket(SESSION* session)
+void NetServer::ClearSendPacket(SESSION* session)
 {
 	NetPacket* packet;
 	int count;
-	for (count = 0; count < session->sendBufCount; count++)
+	for (int count = 0; count < session->sendBufCount; count++)
 	{
 		//--------------------------------------------------------------------
 		// 전송 대기중이던 직렬화 버퍼 정리
 		//--------------------------------------------------------------------
 		packet = session->sendBuf[count];
-		NetPacket::Free(packet);
+		NetPacket::Free(session->sendBuf[count]);
 	}
 	session->sendBufCount = 0;
 
@@ -556,14 +575,14 @@ void LanServer::ClearSendPacket(SESSION* session)
 		NetPacket::Free(packet);
 	}
 }
-void LanServer::QueueUserMessage(DWORD message, LPVOID lpParam)
+void NetServer::QueueUserMessage(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// WorkerThread 에게 Job 요청
 	//--------------------------------------------------------------------
 	PostQueuedCompletionStatus(_hCompletionPort, message, (ULONG_PTR)lpParam, NULL);
 }
-void LanServer::UserMessageProc(DWORD message, LPVOID lpParam)
+void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// 다른 스레드로부터 요청받은 Job 처리
@@ -587,7 +606,7 @@ void LanServer::UserMessageProc(DWORD message, LPVOID lpParam)
 		break;
 	}
 }
-void LanServer::TimeoutProc()
+void NetServer::TimeoutProc()
 {
 	//--------------------------------------------------------------------
 	// 타임아웃 사용 옵션이 OFF일 경우 return
@@ -649,7 +668,7 @@ void LanServer::TimeoutProc()
 
 	_lastTimeoutProc = currentTime;
 }
-void LanServer::UpdateTPS()
+void NetServer::UpdateTPS()
 {
 	//--------------------------------------------------------------------
 	// 모니터링용 TPS 갱신
@@ -658,7 +677,7 @@ void LanServer::UpdateTPS()
 	_oldTPS.recv = InterlockedExchange(&_curTPS.recv, 0);
 	_oldTPS.send = InterlockedExchange(&_curTPS.send, 0);
 }
-bool LanServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
+bool NetServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 {
 	_listenSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (_listenSocket == INVALID_SOCKET)
@@ -713,7 +732,7 @@ bool LanServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 
 	return true;
 }
-bool LanServer::Initial()
+bool NetServer::Initial()
 {
 	size_t maxUserAddress = GetMaximumUserAddress();
 	if (maxUserAddress != MAXIMUM_ADDRESS_RANGE)
@@ -745,21 +764,8 @@ bool LanServer::Initial()
 
 	return true;
 }
-void LanServer::Release()
+void NetServer::Release()
 {
-	SESSION* session;
-	for (int index = 0; index < _sessionMax; index++)
-	{
-		session = &_sessionArray[index];
-		if (session->release != TRUE)
-		{
-			session->release = TRUE;
-			closesocket(session->socket);
-			ClearSendPacket(session);
-			_sessionCnt--;
-		}
-	}
-
 	WORD index;
 	while (_indexStack.size() > 0)
 		_indexStack.Pop(index);
@@ -774,7 +780,7 @@ void LanServer::Release()
 	delete[] _hWorkerThread;
 	delete[] _sessionArray;
 }
-unsigned int LanServer::AcceptThread()
+unsigned int NetServer::AcceptThread()
 {
 	for (;;)
 	{
@@ -843,7 +849,7 @@ unsigned int LanServer::AcceptThread()
 	}
 	return 0;
 }
-unsigned int LanServer::WorkerThread()
+unsigned int NetServer::WorkerThread()
 {
 	for (;;)
 	{
@@ -884,7 +890,7 @@ unsigned int LanServer::WorkerThread()
 	}
 	return 0;
 }
-unsigned int LanServer::ManagementThread()
+unsigned int NetServer::ManagementThread()
 {
 	for (;;)
 	{
@@ -903,18 +909,18 @@ unsigned int LanServer::ManagementThread()
 	}
 	return 0;
 }
-unsigned int __stdcall LanServer::WrapAcceptThread(LPVOID lpParam)
+unsigned int __stdcall NetServer::WrapAcceptThread(LPVOID lpParam)
 {
-	LanServer* server = (LanServer*)lpParam;
+	NetServer* server = (NetServer*)lpParam;
 	return server->AcceptThread();
 }
-unsigned int __stdcall LanServer::WrapWorkerThread(LPVOID lpParam)
+unsigned int __stdcall NetServer::WrapWorkerThread(LPVOID lpParam)
 {
-	LanServer* server = (LanServer*)lpParam;
+	NetServer* server = (NetServer*)lpParam;
 	return server->WorkerThread();
 }
-unsigned int __stdcall LanServer::WrapManagementThread(LPVOID lpParam)
+unsigned int __stdcall NetServer::WrapManagementThread(LPVOID lpParam)
 {
-	LanServer* server = (LanServer*)lpParam;
+	NetServer* server = (NetServer*)lpParam;
 	return server->ManagementThread();
 }

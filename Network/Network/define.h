@@ -14,17 +14,12 @@
 
 struct SESSION
 {
-	SESSION() : releaseFlag(TRUE), ioCount(0), sessionID(-1)
-	{
-	}
-	union
-	{
-		struct
-		{
+	union {
+		struct {
 			BOOL releaseFlag;
 			LONG ioCount;
 		};
-		LONGLONG release;
+		LONGLONG release = TRUE;
 	};
 	OVERLAPPED recvOverlapped;
 	OVERLAPPED sendOverlapped;
@@ -32,6 +27,7 @@ struct SESSION
 	SOCKET socket;
 	WCHAR ip[16];
 	INT port;
+	DWORD lastRecvTime;
 	Jay::RingBuffer recvQ;
 	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
 	Jay::NetPacket* sendBuf[MAX_SENDBUF];
@@ -45,12 +41,6 @@ struct TPS
 	LONG accept;
 	LONG recv;
 	LONG send;
-};
-
-struct MONITORING
-{
-	TPS oldTPS;
-	TPS curTPS;
 };
 
 #endif

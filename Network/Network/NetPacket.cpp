@@ -1,10 +1,13 @@
 #include "NetPacket.h"
 #include "NetException.h"
 #include "Error.h"
+#include "Protocol.h"
 
 #define PACKET_HEADER_SIZE		10
+#define PACKET_SYMMETRIC_KEY	0x32
 
-USEJAYNAMESPACE
+using namespace Jay;
+
 ObjectPool_TLS<NetPacket> NetPacket::_packetPool(0, false);
 NetPacket::NetPacket(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
 {
@@ -22,11 +25,18 @@ NetPacket* NetPacket::Alloc(void)
 {
 	NetPacket* packet = _packetPool.Alloc();
 	packet->ClearBuffer();
+	packet->_encode = false;
+	packet->_refCount = 1;
 	return packet;
 }
 void NetPacket::Free(NetPacket* packet)
 {
-	_packetPool.Free(packet);
+	if (InterlockedDecrement(&packet->_refCount) == 0)
+		_packetPool.Free(packet);
+}
+long NetPacket::IncrementRefCount(void)
+{
+	return InterlockedIncrement(&_refCount);
 }
 int NetPacket::GetBufferSize(void)
 {
@@ -118,13 +128,121 @@ int NetPacket::PutHeader(const char* header, int size)
 	memmove(_header, header, size);
 	return size;
 }
-int NetPacket::IncrementRefCount(void)
+void NetPacket::Encode(void)
 {
-	return InterlockedIncrement(&_refCount);
+	if (_encode)
+		return;
+
+	NET_PACKET_HEADER header;
+	header.code = PACKET_CODE;
+	header.len = GetUseSize();
+	header.randKey = rand() % 256;
+	header.checkSum = MakeChecksum();
+
+	PutHeader((char*)&header, sizeof(NET_PACKET_HEADER));
+	Encrypt();
+
+	_encode = true;
 }
-int NetPacket::DecrementRefCount(void)
+bool NetPacket::Decode(void)
 {
-	return InterlockedDecrement(&_refCount);
+	Decrypt();
+
+	NET_PACKET_HEADER* header = (NET_PACKET_HEADER*)GetHeaderPtr();
+	if ((header->checkSum != MakeChecksum()))
+		return false;
+
+	return true;
+}
+void NetPacket::Encrypt(void)
+{
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// 암호화 대상				(checkSum + Payload)
+	// 상호 고정키 1Byte - K		(클라 - 서버 쌍방의 상수값)
+	// 공개 랜덤키 1Byte - RK	(클라 - 서버 송수신 패킷 헤더에 포함)
+	// 
+	// 원본 데이터 바이트 단위  D1 D2 D3 D4
+	// |-----------------------------------------------------------------------------------------------------------|
+	// |           D1           |            D2             |            D3             |             D4           |	
+	// |-----------------------------------------------------------------------------------------------------------|
+	// |   D1 ^ (RK + 1) = P1   |  D2 ^ (P1 + RK + 2) = P2  |  D3 ^ (P2 + RK + 3) = P3  |  D4 ^ (P3 + RK + 4) = P4 |
+	// |   P1 ^ (K + 1) = E1    |  P2 ^ (E1 + K + 2) = E2   |  P3 ^ (E2 + K + 3) = E3   |  P4 ^ (E3 + K + 4) = E4  |
+	// 
+	// 암호 데이터 바이트 단위  E1 E2 E3 E4
+	// ------------------------------------------------------------------------------------------------------------|
+	// |		   E1           |            E2             |            E3             |             E4           |
+	// |-----------------------------------------------------------------------------------------------------------|
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	NET_PACKET_HEADER* header = (NET_PACKET_HEADER*)GetHeaderPtr();
+	BYTE* byte = (BYTE*)&header->checkSum;
+	BYTE P1 = 0;
+	BYTE E1 = 0;
+
+	int size = sizeof(header->checkSum) + GetUseSize();
+	for (int i = 1; i <= size; i++)
+	{
+		*byte ^= (P1 + header->randKey + i);
+		P1 = *byte;
+
+		*byte ^= (E1 + PACKET_SYMMETRIC_KEY + i);
+		E1 = *byte;
+
+		byte++;
+	}
+}
+void NetPacket::Decrypt(void)
+{
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// 복호화 대상				(checkSum + Payload)
+	// 상호 고정키 1Byte - K		(클라 - 서버 쌍방의 상수값)
+	// 공개 랜덤키 1Byte - RK	(클라 - 서버 송수신 패킷 헤더에 포함)
+	// 
+	// 암호 데이터 바이트 단위  E1 E2 E3 E4
+	// ------------------------------------------------------------------------------------------------------------|
+	// |		   E1           |            E2             |            E3             |             E4           |
+	// |-----------------------------------------------------------------------------------------------------------|
+	// 
+	// 원본 데이터 바이트 단위  D1 D2 D3 D4
+	// |-----------------------------------------------------------------------------------------------------------|
+	// |           D1           |            D2             |            D3             |             D4           |		
+	// |-----------------------------------------------------------------------------------------------------------|
+	// |   E1 ^ (K + 1) = P1    |  E2 ^ (E1 + K + 2) = P2   |  E3 ^ (E2 + K + 3) = P3   |  E4 ^ (E3 + K + 4) = P4  |
+	// |   P1 ^ (RK + 1) = D1   |  P2 ^ (P1 + RK + 2) = D2  |  P3 ^ (P2 + RK + 3) = D3  |  P4 ^ (P3 + RK + 4) = D4 |
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	NET_PACKET_HEADER* header = (NET_PACKET_HEADER*)GetHeaderPtr();
+	BYTE* byte = (BYTE*)&header->checkSum;
+	BYTE E1 = 0;
+	BYTE P1 = 0;
+	BYTE temp;
+
+	int size = sizeof(header->checkSum) + GetUseSize();
+	for (int i = 1; i <= size; i++)
+	{
+		temp = *byte;
+		*byte ^= (E1 + PACKET_SYMMETRIC_KEY + i);
+		E1 = temp;
+
+		temp = *byte;
+		*byte ^= (P1 + header->randKey + i);
+		P1 = temp;
+
+		byte++;
+	}
+}
+unsigned char NetPacket::MakeChecksum(void)
+{
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Payload 부분을 1byte 씩 모두 더해서 % 256 한 unsigned char 값
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+	BYTE* byte = (BYTE*)GetFrontBufferPtr();
+	int size = GetUseSize();
+	int checkSum = 0;
+	for (int i = 1; i <= size; i++)
+	{
+		checkSum += *byte;
+		byte++;
+	}
+	return checkSum % 256;
 }
 NetPacket & NetPacket::operator=(const NetPacket & packet)
 {
