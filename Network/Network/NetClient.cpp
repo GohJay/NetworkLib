@@ -1,4 +1,4 @@
-#include "NetServer.h"
+#include "NetClient.h"
 #include "Error.h"
 #include "Protocol.h"
 #include "User.h"
@@ -7,12 +7,11 @@
 #include "NetException.h"
 #include <process.h>
 #include <ws2tcpip.h>
-#include <timeapi.h>
 #pragma comment(lib, "ws2_32")
 
 using namespace Jay;
 
-NetServer::NetServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _totalAcceptCnt(0)
+NetClient::NetClient()
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
@@ -21,112 +20,141 @@ NetServer::NetServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _t
 		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, status);
 		return;
 	}
-}
-NetServer::~NetServer()
-{
-	WSACleanup();
-}
-bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
-{
-	_workerCreateCnt = workerCreateCnt;
-	_workerRunningCnt = workerRunningCnt;
-	_sessionMax = sessionMax;
-	_timeoutSec = timeoutSec;
-	_packetCode = packetCode;
-	_packetKey = packetKey;
-	memset(&_curTPS, 0, sizeof(TPS));
-	memset(&_oldTPS, 0, sizeof(TPS));
-
-	//--------------------------------------------------------------------
-	// Listen
-	//--------------------------------------------------------------------
-	if (!Listen(ipaddress, port, nagle))
-		return false;
 
 	//--------------------------------------------------------------------
 	// Initial
 	//--------------------------------------------------------------------
-	if (!Initial())
+	_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+	if (_hCompletionPort == NULL)
 	{
-		closesocket(_listenSocket);
-		return false;
+		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, GetLastError());
+		return;
 	}
 
 	//--------------------------------------------------------------------
-	// Thread Begin
+	// WorkerThread Begin
 	//--------------------------------------------------------------------
-	for (int i = 0; i < _workerCreateCnt; i++)
-		_hWorkerThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapWorkerThread, this, 0, NULL);
-	_hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, WrapAcceptThread, this, 0, NULL);
-	_hManagementThread = (HANDLE)_beginthreadex(NULL, 0, WrapManagementThread, this, 0, NULL);
-
-	return true;
+	_hWorkerThread = (HANDLE)_beginthreadex(NULL, 0, WrapWorkerThread, this, 0, NULL);
 }
-void NetServer::Stop()
+NetClient::~NetClient()
 {
 	//--------------------------------------------------------------------
-	// AcceptThread, ManagementThread 종료 신호 보내기
+	// 남아있는 세션 정리
 	//--------------------------------------------------------------------
-	closesocket(_listenSocket);
-	SetEvent(_hExitThreadEvent);
+	if (_session.releaseFlag != TRUE)
+		DisconnectSession(&_session);
 
 	//--------------------------------------------------------------------
-	// AcceptThread, ManagementThread 종료 대기
+	// 세션 정리 대기
 	//--------------------------------------------------------------------
-	HANDLE hHandle[2] = { _hAcceptThread, _hManagementThread };
-	DWORD ret;
-	ret = WaitForMultipleObjects(2, hHandle, TRUE, INFINITE);
-	if (ret == WAIT_FAILED)
-		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-
-	//--------------------------------------------------------------------
-	// 남아있는 모든 세션 정리
-	//--------------------------------------------------------------------
-	SESSION* session;
-	for (int index = 0; index < _sessionMax; index++)
-	{
-		session = &_sessionArray[index];
-		if (session->releaseFlag != TRUE)
-			DisconnectSession(session);
-	}
-
-	//--------------------------------------------------------------------
-	// 모든 세션 정리 대기
-	//--------------------------------------------------------------------
-	while (_sessionCnt > 0)
+	while (_session.releaseFlag != TRUE)
 		Sleep(500);
 
 	//--------------------------------------------------------------------
-	// WorkerThread 종료 신호 보내기
+	// WorkerThread End
 	//--------------------------------------------------------------------
 	PostQueuedCompletionStatus(_hCompletionPort, 0, NULL, NULL);
-
-	//--------------------------------------------------------------------
-	// WorkerThread 종료 대기
-	//--------------------------------------------------------------------
-	ret = WaitForMultipleObjects(_workerCreateCnt, _hWorkerThread, TRUE, INFINITE);
-	if (ret == WAIT_FAILED)
-		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+	WaitForSingleObject(_hWorkerThread, INFINITE);
 
 	//--------------------------------------------------------------------
 	// Release
 	//--------------------------------------------------------------------
-	Release();
+	CloseHandle(_hCompletionPort);
+	CloseHandle(_hWorkerThread);
+
+	WSACleanup();
 }
-bool NetServer::Disconnect(DWORD64 sessionID)
+bool NetClient::Connect(const wchar_t* ipaddress, int port, BYTE packetCode, BYTE packetKey, bool nagle)
 {
-	SESSION* session = DuplicateSession(sessionID);
+	//--------------------------------------------------------------------
+	// 이미 연결된 정보가 있는지 확인
+	//--------------------------------------------------------------------
+	if (_session.releaseFlag != TRUE)
+	{
+		OnError(NET_ERROR_CONNECT_ERROR, __FUNCTIONW__, __LINE__, NULL, NULL);
+		return false;
+	}
+
+	SOCKADDR_IN svrAddr;
+	ZeroMemory(&svrAddr, sizeof(svrAddr));
+	svrAddr.sin_family = AF_INET;
+	svrAddr.sin_port = htons(port);
+	InetPton(AF_INET, ipaddress, &svrAddr.sin_addr);
+
+	//--------------------------------------------------------------------
+	// 연결에 사용할 소켓 할당
+	//--------------------------------------------------------------------
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sock == INVALID_SOCKET)
+	{
+		OnError(NET_ERROR_CONNECT_ERROR, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+		return false;
+	}
+
+	int option;
+	int ret;
+	if (!nagle)
+	{
+		option = TRUE;
+		ret = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&option, sizeof(option));
+		if (ret == SOCKET_ERROR)
+		{
+			OnError(NET_ERROR_CONNECT_ERROR, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+			closesocket(sock);
+			return false;
+		}
+	}
+
+	//--------------------------------------------------------------------
+	// 서버에 연결
+	//--------------------------------------------------------------------
+	ret = connect(sock, (SOCKADDR*)&svrAddr, sizeof(svrAddr));
+	if (ret == SOCKET_ERROR)
+	{
+		OnError(NET_ERROR_CONNECT_ERROR, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+		closesocket(sock);
+		return false;
+	}
+
+	_packetCode = packetCode;
+	_packetKey = packetKey;
+
+	//--------------------------------------------------------------------
+	// 세션 할당
+	//--------------------------------------------------------------------
+	SESSION* session = CreateSession(sock, ipaddress, port);
+
+	//--------------------------------------------------------------------
+	// 할당된 세션을 IOCP에 등록
+	//--------------------------------------------------------------------
+	CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)&session, NULL);
+
+	//--------------------------------------------------------------------
+	// 연결 정보를 컨텐츠 부에 알리고 수신 등록
+	//--------------------------------------------------------------------
+	OnEnterJoinServer();
+	RecvPost(session);
+
+	//--------------------------------------------------------------------
+	// 해당 스레드에서 참조하던 세션 반환
+	//--------------------------------------------------------------------
+	CloseSession(session);
+	return true;
+}
+bool NetClient::Disconnect()
+{
+	SESSION* session = DuplicateSession();
 	if (session != nullptr)
 	{
 		DisconnectSession(session);
-		CloseSession(session);
+		CloseHandle(session);
 		return true;
 	}
 	return false;
 }
-bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
+bool NetClient::SendPacket(NetPacket* packet)
 {
-	SESSION* session = DuplicateSession(sessionID);
+	SESSION* session = DuplicateSession();
 	if (session != nullptr)
 	{
 		TrySendPacket(session, packet);
@@ -135,57 +163,20 @@ bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
 	}
 	return false;
 }
-int NetServer::GetSessionCount()
+SESSION* NetClient::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
-	return _sessionCnt;
+	InterlockedIncrement(&_session.ioCount);
+	_session.socket = socket;
+	wcscpy_s(_session.ip, ipaddress);
+	_session.port = port;
+	_session.recvQ.ClearBuffer();
+	_session.sendBufCount = 0;
+	_session.sendFlag = FALSE;
+	_session.disconnectFlag = FALSE;
+	_session.releaseFlag = FALSE;
+	return &_session;
 }
-int NetServer::GetUsePacketCount()
-{
-	return NetPacket::_packetPool.GetUseCount();
-}
-int NetServer::GetTotalAcceptCount()
-{
-	return _totalAcceptCnt;
-}
-int NetServer::GetAcceptTPS()
-{
-	return _oldTPS.accept;
-}
-int NetServer::GetRecvTPS()
-{
-	return _oldTPS.recv;
-}
-int NetServer::GetSendTPS()
-{
-	return _oldTPS.send;
-}
-SESSION* NetServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
-{
-	WORD index;
-	if (!_indexStack.Pop(index))
-	{
-		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE);
-		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, NULL, NULL);
-		return nullptr;
-	}
-
-	SESSION* session = &_sessionArray[index];
-	InterlockedIncrement(&session->ioCount);
-	session->socket = socket;
-	wcscpy_s(session->ip, ipaddress);
-	session->port = port;
-	session->lastRecvTime = timeGetTime();
-	session->recvQ.ClearBuffer();
-	session->sendBufCount = 0;
-	session->sendFlag = FALSE;
-	session->disconnectFlag = FALSE;
-	session->sessionID = MAKE_SESSIONID(++_sessionKey, index);
-	session->releaseFlag = FALSE;
-
-	InterlockedIncrement16((SHORT*)&_sessionCnt);
-	return session;
-}
-void NetServer::ReleaseSession(SESSION* session)
+void NetClient::ReleaseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
@@ -202,14 +193,27 @@ void NetServer::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 컨텐츠 부에 알림 요청
 	//--------------------------------------------------------------------
-	QueueUserMessage(UM_ALERT_CLIENT_LEAVE, (LPVOID)session->sessionID);
-
-	WORD index = GET_SESSION_INDEX(session->sessionID);
-	_indexStack.Push(index);
-
-	InterlockedDecrement16((SHORT*)&_sessionCnt);
+	QueueUserMessage(UM_ALERT_SERVER_LEAVE, NULL);
 }
-void NetServer::DisconnectSession(SESSION* session)
+SESSION* NetClient::DuplicateSession()
+{
+	InterlockedIncrement(&_session.ioCount);
+
+	//--------------------------------------------------------------------
+	// 릴리즈된 세션인지 확인
+	//--------------------------------------------------------------------
+	if (_session.releaseFlag != TRUE)
+	{
+		// 찾던 세션 획득
+		return &_session;
+	}
+
+	if (InterlockedDecrement(&_session.ioCount) == 0)
+		ReleaseSession(&_session);
+
+	return nullptr;
+}
+void NetClient::DisconnectSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 소켓에 현재 요청되어있는 모든 IO 를 중단
@@ -217,39 +221,7 @@ void NetServer::DisconnectSession(SESSION* session)
 	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == FALSE)
 		CancelIoEx((HANDLE)session->socket, NULL);
 }
-SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
-{
-	WORD index = GET_SESSION_INDEX(sessionID);
-	SESSION* session = &_sessionArray[index];
-
-	InterlockedIncrement(&session->ioCount);
-
-	do
-	{
-		//--------------------------------------------------------------------
-		// 릴리즈된 세션인지 확인
-		//--------------------------------------------------------------------
-		if (session->releaseFlag == TRUE)
-			break;
-
-		//--------------------------------------------------------------------
-		// 재사용된 세션인지 확인
-		//--------------------------------------------------------------------
-		if (session->sessionID != sessionID)
-			break;
-
-		//--------------------------------------------------------------------
-		// 찾던 세션 획득
-		//--------------------------------------------------------------------
-		return session;
-	} while (0);
-
-	if (InterlockedDecrement(&session->ioCount) == 0)
-		ReleaseSession(session);
-
-	return nullptr;
-}
-void NetServer::CloseSession(SESSION* session)
+void NetClient::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 참조 세션 반환
@@ -257,7 +229,7 @@ void NetServer::CloseSession(SESSION* session)
 	if (InterlockedDecrement(&session->ioCount) == 0)
 		ReleaseSession(session);
 }
-void NetServer::RecvPost(SESSION* session)
+void NetClient::RecvPost(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// Disconnect Flag 가 켜져있을 경우 return
@@ -281,19 +253,18 @@ void NetServer::RecvPost(SESSION* session)
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
 	ZeroMemory(&session->recvOverlapped, sizeof(session->recvOverlapped));
-	WSABUF wsaBuf[2];
-
-	wsaBuf[0].len = directSize;
-	wsaBuf[0].buf = session->recvQ.GetRearBufferPtr();
-	wsaBuf[1].len = session->recvQ.GetFreeSize() - directSize;
-	wsaBuf[1].buf = session->recvQ.GetBufferPtr();
+	WSABUF wsaRecvBuf[2];
+	wsaRecvBuf[0].buf = session->recvQ.GetRearBufferPtr();
+	wsaRecvBuf[0].len = directSize;
+	wsaRecvBuf[1].len = session->recvQ.GetFreeSize() - directSize;
+	wsaRecvBuf[1].buf = session->recvQ.GetBufferPtr();
 
 	//--------------------------------------------------------------------
 	// WSARecv 처리
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -322,7 +293,7 @@ void NetServer::RecvPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
 	}
 }
-void NetServer::SendPost(SESSION* session)
+void NetClient::SendPost(SESSION* session)
 {
 	for (;;)
 	{
@@ -391,7 +362,7 @@ void NetServer::SendPost(SESSION* session)
 				break;
 			}
 
-			// ioCount가 0이라면 세션 정리
+			// ioCount가 0이라면 연결 끊기
 			if (InterlockedDecrement(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
@@ -404,21 +375,20 @@ void NetServer::SendPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
 	}
 }
-void NetServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
+void NetClient::RecvRoutine(SESSION* session, DWORD cbTransferred)
 {
-	session->lastRecvTime = timeGetTime();
 	session->recvQ.MoveRear(cbTransferred);
 	CompleteRecvPacket(session);
 	RecvPost(session);
 }
-void NetServer::SendRoutine(SESSION* session, DWORD cbTransferred)
+void NetClient::SendRoutine(SESSION* session, DWORD cbTransferred)
 {
 	CompleteSendPacket(session);
 	InterlockedExchange((LONG*)&session->sendFlag, FALSE);
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
-void NetServer::CompleteRecvPacket(SESSION* session)
+void NetClient::CompleteRecvPacket(SESSION* session)
 {
 	NET_PACKET_HEADER header;
 	for (;;)
@@ -469,7 +439,7 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 			break;
 		}
 		packet->MoveRear(ret);
-		
+
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼 디코딩 처리
 		//--------------------------------------------------------------------
@@ -486,21 +456,20 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 			//--------------------------------------------------------------------
 			// 컨텐츠 부에 Payload 를 담은 직렬화 버퍼 전달
 			//--------------------------------------------------------------------
-			OnRecv(session->sessionID, packet);
+			OnRecv(packet);
 		}
 		catch (NetException& ex)
 		{
 			OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			DisconnectSession(session);
 			NetPacket::Free(packet);
-			break;
+			return;
 		}
 
 		NetPacket::Free(packet);
-		InterlockedIncrement(&_curTPS.recv);
 	}
 }
-void NetServer::CompleteSendPacket(SESSION* session)
+void NetClient::CompleteSendPacket(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 전송 완료한 직렬화 버퍼 정리
@@ -513,10 +482,9 @@ void NetServer::CompleteSendPacket(SESSION* session)
 		NetPacket::Free(packet);
 	}
 
-	InterlockedAdd(&_curTPS.send, session->sendBufCount);
 	session->sendBufCount = 0;
 }
-void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
+void NetClient::TrySendPacket(SESSION* session, NetPacket* packet)
 {
 	int size = session->sendQ.size();
 	if (size > MAX_SENDBUF)
@@ -544,7 +512,7 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	InterlockedIncrement(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
-void NetServer::ClearSendPacket(SESSION* session)
+void NetClient::ClearSendPacket(SESSION* session)
 {
 	NetPacket* packet;
 	int count;
@@ -567,14 +535,14 @@ void NetServer::ClearSendPacket(SESSION* session)
 		NetPacket::Free(packet);
 	}
 }
-void NetServer::QueueUserMessage(DWORD message, LPVOID lpParam)
+void NetClient::QueueUserMessage(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// WorkerThread 에게 Job 요청
 	//--------------------------------------------------------------------
 	PostQueuedCompletionStatus(_hCompletionPort, message, (ULONG_PTR)lpParam, NULL);
 }
-void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
+void NetClient::UserMessageProc(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// 다른 스레드로부터 요청받은 Job 처리
@@ -588,260 +556,16 @@ void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
 			CloseSession(session);
 		}
 		break;
-	case UM_ALERT_CLIENT_LEAVE:
+	case UM_ALERT_SERVER_LEAVE:
 		{
-			DWORD64 sessionID = (DWORD64)lpParam;
-			OnClientLeave(sessionID);
+			OnLeaveServer();
 		}
 		break;
 	default:
 		break;
 	}
 }
-void NetServer::TimeoutProc()
-{
-	//--------------------------------------------------------------------
-	// 타임아웃 사용 옵션이 OFF일 경우 return
-	//--------------------------------------------------------------------
-	if (_timeoutSec <= 0)
-		return;
-
-	//--------------------------------------------------------------------
-	// 타임아웃 처리 시간이 아직 아닐 경우 return
-	//--------------------------------------------------------------------
-	DWORD currentTime = timeGetTime();
-	DWORD timeout = currentTime - (_timeoutSec * 1000);
-	if (timeout < _lastTimeoutProc)
-		return;
-
-	SESSION* session;
-	DWORD64 sessionID;
-	for (int index = 0; index < _sessionMax; index++)
-	{
-		//--------------------------------------------------------------------
-		// 릴리즈된 세션인지 확인
-		//--------------------------------------------------------------------
-		session = &_sessionArray[index];
-		if (session->releaseFlag == TRUE)
-			continue;
-
-		//--------------------------------------------------------------------
-		// 타임아웃 여부 판단
-		//--------------------------------------------------------------------
-		sessionID = session->sessionID;
-		if (session->lastRecvTime > timeout)
-			continue;
-
-		InterlockedIncrement(&session->ioCount);
-
-		do
-		{
-			//--------------------------------------------------------------------
-			// 릴리즈된 세션인지 확인
-			//--------------------------------------------------------------------
-			if (session->releaseFlag == TRUE)
-				break;
-
-			//--------------------------------------------------------------------
-			// 재사용된 세션인지 확인
-			//--------------------------------------------------------------------
-			if (session->sessionID != sessionID)
-				break;
-
-			//--------------------------------------------------------------------
-			// 타임아웃 처리
-			//--------------------------------------------------------------------
-			DisconnectSession(session);
-		} while (0);
-
-		if (InterlockedDecrement(&session->ioCount) == 0)
-			ReleaseSession(session);
-	}
-
-	_lastTimeoutProc = currentTime;
-}
-void NetServer::UpdateTPS()
-{
-	//--------------------------------------------------------------------
-	// 모니터링용 TPS 갱신
-	//--------------------------------------------------------------------
-	_oldTPS.accept = InterlockedExchange(&_curTPS.accept, 0);
-	_oldTPS.recv = InterlockedExchange(&_curTPS.recv, 0);
-	_oldTPS.send = InterlockedExchange(&_curTPS.send, 0);
-}
-bool NetServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
-{
-	_listenSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (_listenSocket == INVALID_SOCKET)
-	{
-		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-		return false;
-	}
-
-	linger so_linger;
-	so_linger.l_onoff = 1;
-	so_linger.l_linger = 0;
-	int ret = setsockopt(_listenSocket, SOL_SOCKET, SO_LINGER, (char*)&so_linger, sizeof(so_linger));
-	if (ret == SOCKET_ERROR)
-	{
-		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-		closesocket(_listenSocket);
-		return false;
-	}
-
-	if (!nagle)
-	{
-		int option = TRUE;
-		ret = setsockopt(_listenSocket, IPPROTO_TCP, TCP_NODELAY, (char*)&option, sizeof(option));
-		if (ret == SOCKET_ERROR)
-		{
-			OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-			closesocket(_listenSocket);
-			return false;
-		}
-	}
-
-	SOCKADDR_IN listenAddr;
-	ZeroMemory(&listenAddr, sizeof(listenAddr));
-	listenAddr.sin_family = AF_INET;
-	listenAddr.sin_port = htons(port);
-	InetPton(AF_INET, ipaddress, &listenAddr.sin_addr);
-	ret = bind(_listenSocket, (SOCKADDR*)&listenAddr, sizeof(listenAddr));
-	if (ret == SOCKET_ERROR)
-	{
-		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-		closesocket(_listenSocket);
-		return false;
-	}
-
-	ret = listen(_listenSocket, SOMAXCONN_HINT(65535));
-	if (ret == SOCKET_ERROR)
-	{
-		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-		closesocket(_listenSocket);
-		return false;
-	}
-
-	return true;
-}
-bool NetServer::Initial()
-{
-	size_t maxUserAddress = GetMaximumUserAddress();
-	if (maxUserAddress != MAXIMUM_ADDRESS_RANGE)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, maxUserAddress);
-		return false;
-	}
-
-	_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, _workerRunningCnt);
-	if (_hCompletionPort == NULL)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
-		return false;
-	}
-
-	_hExitThreadEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (_hExitThreadEvent == NULL)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
-		CloseHandle(_hCompletionPort);
-		return false;
-	}
-
-	_hWorkerThread = new HANDLE[_workerCreateCnt];
-	_sessionArray = new SESSION[_sessionMax];
-
-	for (int index = _sessionMax - 1; index >= 0; index--)
-		_indexStack.Push(index);
-
-	return true;
-}
-void NetServer::Release()
-{
-	WORD index;
-	while (_indexStack.size() > 0)
-		_indexStack.Pop(index);
-
-	CloseHandle(_hCompletionPort);
-	CloseHandle(_hExitThreadEvent);
-	CloseHandle(_hManagementThread);
-	CloseHandle(_hAcceptThread);
-	for (int i = 0; i < _workerCreateCnt; i++)
-		CloseHandle(_hWorkerThread[i]);
-
-	delete[] _hWorkerThread;
-	delete[] _sessionArray;
-}
-unsigned int NetServer::AcceptThread()
-{
-	for (;;)
-	{
-		SOCKADDR_IN clientAddr;
-		int clientSize = sizeof(clientAddr);
-		ZeroMemory(&clientAddr, clientSize);
-
-		//--------------------------------------------------------------------
-		// Accept 처리. 처리할 것이 없다면 Block
-		//--------------------------------------------------------------------
-		SOCKET client = accept(_listenSocket, (SOCKADDR*)&clientAddr, &clientSize);
-		if (client == INVALID_SOCKET)
-			break;
-
-		//--------------------------------------------------------------------
-		// 동시접속자 수 확인. 최대치를 초과할 경우 연결 종료
-		//--------------------------------------------------------------------
-		if (_sessionCnt >= _sessionMax)
-		{
-			closesocket(client);
-			continue;
-		}
-
-		//--------------------------------------------------------------------
-		// 컨텐츠 부에 신규 접속자의 IP, Port 를 전달하여 접속을 허용할 것인지 확인
-		//--------------------------------------------------------------------
-		wchar_t ip[16];
-		int port;
-		InetNtop(AF_INET, &clientAddr.sin_addr, ip, sizeof(ip) / 2);
-		port = ntohs(clientAddr.sin_port);
-		if (!OnConnectionRequest(ip, port))
-		{
-			// 컨텐츠 부에서 접속을 허용하지 않는다면 연결을 끊는다.
-			closesocket(client);
-			continue;
-		}
-
-		//--------------------------------------------------------------------
-		// 신규 접속자의 세션 할당
-		//--------------------------------------------------------------------
-		SESSION* session = CreateSession(client, ip, port);
-		if (session == nullptr)
-		{
-			closesocket(client);
-			continue;
-		}
-
-		//--------------------------------------------------------------------
-		// 할당된 세션을 IOCP에 등록
-		//--------------------------------------------------------------------
-		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
-
-		//--------------------------------------------------------------------
-		// 신규 접속자의 정보를 컨텐츠 부에 알리고 수신 등록
-		//--------------------------------------------------------------------
-		OnClientJoin(session->sessionID);
-		RecvPost(session);
-
-		//--------------------------------------------------------------------
-		// AcceptThread 에서 참조하던 세션 반환
-		//--------------------------------------------------------------------
-		CloseSession(session);
-
-		InterlockedIncrement((LONG*)&_totalAcceptCnt);
-		InterlockedIncrement(&_curTPS.accept);
-	}
-	return 0;
-}
-unsigned int NetServer::WorkerThread()
+unsigned int NetClient::WorkerThread()
 {
 	for (;;)
 	{
@@ -882,37 +606,8 @@ unsigned int NetServer::WorkerThread()
 	}
 	return 0;
 }
-unsigned int NetServer::ManagementThread()
+unsigned int __stdcall NetClient::WrapWorkerThread(LPVOID lpParam)
 {
-	for (;;)
-	{
-		DWORD ret = WaitForSingleObject(_hExitThreadEvent, 1000);
-		switch (ret)
-		{
-		case WAIT_OBJECT_0:
-			return 0;
-		case WAIT_TIMEOUT:
-			UpdateTPS();
-			TimeoutProc();
-			break;
-		default:
-			break;
-		}
-	}
-	return 0;
-}
-unsigned int __stdcall NetServer::WrapAcceptThread(LPVOID lpParam)
-{
-	NetServer* server = (NetServer*)lpParam;
-	return server->AcceptThread();
-}
-unsigned int __stdcall NetServer::WrapWorkerThread(LPVOID lpParam)
-{
-	NetServer* server = (NetServer*)lpParam;
-	return server->WorkerThread();
-}
-unsigned int __stdcall NetServer::WrapManagementThread(LPVOID lpParam)
-{
-	NetServer* server = (NetServer*)lpParam;
-	return server->ManagementThread();
+	NetClient* client = (NetClient*)lpParam;
+	return client->WorkerThread();
 }

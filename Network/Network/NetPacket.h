@@ -5,7 +5,9 @@
 
 namespace Jay
 {
+	class LanClient;
 	class LanServer;
+	class NetClient;
 	class NetServer;
 	class NetPacketPtr;
 	class NetPacket
@@ -249,7 +251,9 @@ namespace Jay
 		friend class ObjectPool_TLS<NetPacket>;
 		friend class NetPacketPtr;
 		friend class NetServer;
+		friend class NetClient;
 		friend class LanServer;
+		friend class LanClient;
 	};
 }
 

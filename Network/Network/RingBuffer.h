@@ -4,7 +4,9 @@
 
 namespace Jay
 {
+	class LanClient;
 	class LanServer;
+	class NetClient;
 	class NetServer;
 	class RingBuffer
 	{
@@ -125,7 +127,9 @@ namespace Jay
 		char* _rear;
 		int _bufferSize;
 		friend class NetServer;
+		friend class NetClient;
 		friend class LanServer;
+		friend class LanClient;
 	};
 }
 

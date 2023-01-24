@@ -141,8 +141,10 @@
     <ClInclude Include="Enviroment.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="FileUtil.h" />
+    <ClInclude Include="LanClient.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
+    <ClInclude Include="NetClient.h" />
     <ClInclude Include="NetException.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="ObjectPool_TLS.h" />
@@ -157,8 +159,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FileUtil.cpp" />
+    <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="NetClient.cpp" />
     <ClCompile Include="NetPacket.cpp" />
     <ClCompile Include="NetPacketPtr.cpp" />
     <ClCompile Include="NetServer.cpp" />

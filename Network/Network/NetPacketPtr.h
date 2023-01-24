@@ -5,8 +5,6 @@
 
 namespace Jay
 {
-	class NetServer;
-	class LanServer;
 	class NetPacketPtr
 	{
 		/**
@@ -64,8 +62,6 @@ namespace Jay
 		inline NetPacket* operator *();
 	private:
 		NetPacket* _packet;
-		friend class NetServer;
-		friend class LanServer;
 	};
 
 	inline NetPacket* NetPacketPtr::operator->()
