@@ -21,7 +21,7 @@ namespace Jay
 		NetServer();
 		virtual ~NetServer();
 	public:
-		bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, int timeoutSec = 0, bool nagle = true);
+		bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
 		void Stop();
 		bool Disconnect(DWORD64 sessionID);
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
@@ -84,6 +84,8 @@ namespace Jay
 		int _totalAcceptCnt;
 		TPS _curTPS;
 		TPS _oldTPS;
+		BYTE _packetCode;
+		BYTE _packetKey;
 	};
 }
 

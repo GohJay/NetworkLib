@@ -162,34 +162,34 @@ namespace Jay
 		/**
 		* @brief	패킷 인코딩 처리
 		* @details
-		* @param	void
+		* @param	BYTE(패킷 코드), BYTE(패킷 대칭키)
 		* @return	void
 		**/
-		void Encode(void);
+		void Encode(BYTE code, BYTE key);
 
 		/**
 		* @brief	패킷 디코딩 처리
 		* @details
-		* @param	void
+		* @param	BYTE(패킷 코드), BYTE(패킷 대칭키)
 		* @return	bool(패킷 디코딩 결과)
 		**/
-		bool Decode(void);
+		bool Decode(BYTE code, BYTE key);
 
 		/**
 		* @brief	패킷 암호화 처리
 		* @details
-		* @param	void
+		* @param	BYTE(패킷 대칭키)
 		* @return	void
 		**/
-		void Encrypt(void);
+		void Encrypt(BYTE key);
 
 		/**
 		* @brief	패킷 복호화 처리
 		* @details
-		* @param	void
+		* @param	BYTE(패킷 대칭키)
 		* @return	void
 		**/
-		void Decrypt(void);
+		void Decrypt(BYTE key);
 
 		/**
 		* @brief	패킷 체크섬 얻기
@@ -247,7 +247,6 @@ namespace Jay
 		bool _encode;
 		static ObjectPool_TLS<NetPacket> _packetPool;
 		friend class ObjectPool_TLS<NetPacket>;
-		friend class ObjectPool<NetPacket>;
 		friend class NetPacketPtr;
 		friend class NetServer;
 		friend class LanServer;

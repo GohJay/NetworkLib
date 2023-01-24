@@ -1,8 +1,6 @@
 #ifndef __PROTOCOL__H
 #define __PROTOCOL__H
 
-#define PACKET_CODE		0x77
-
 #pragma pack(push, 1)
 
 struct LAN_PACKET_HEADER

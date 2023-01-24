@@ -3,8 +3,7 @@
 #include "Error.h"
 #include "Protocol.h"
 
-#define PACKET_HEADER_SIZE		10
-#define PACKET_SYMMETRIC_KEY	0x32
+#define PACKET_HEADER_SIZE		8
 
 using namespace Jay;
 
@@ -25,8 +24,8 @@ NetPacket* NetPacket::Alloc(void)
 {
 	NetPacket* packet = _packetPool.Alloc();
 	packet->ClearBuffer();
-	packet->_encode = false;
 	packet->_refCount = 1;
+	packet->_encode = false;
 	return packet;
 }
 void NetPacket::Free(NetPacket* packet)
@@ -128,33 +127,37 @@ int NetPacket::PutHeader(const char* header, int size)
 	memmove(_header, header, size);
 	return size;
 }
-void NetPacket::Encode(void)
+void NetPacket::Encode(BYTE code, BYTE key)
 {
 	if (_encode)
 		return;
 
 	NET_PACKET_HEADER header;
-	header.code = PACKET_CODE;
+	header.code = code;
 	header.len = GetUseSize();
 	header.randKey = rand() % 256;
 	header.checkSum = MakeChecksum();
 
 	PutHeader((char*)&header, sizeof(NET_PACKET_HEADER));
-	Encrypt();
+	Encrypt(key);
 
 	_encode = true;
 }
-bool NetPacket::Decode(void)
+bool NetPacket::Decode(BYTE code, BYTE key)
 {
-	Decrypt();
-
 	NET_PACKET_HEADER* header = (NET_PACKET_HEADER*)GetHeaderPtr();
-	if ((header->checkSum != MakeChecksum()))
+	if (header->code != code)
+		return false;
+
+	Decrypt(key);
+
+	BYTE checkSum = MakeChecksum();
+	if (header->checkSum != checkSum)
 		return false;
 
 	return true;
 }
-void NetPacket::Encrypt(void)
+void NetPacket::Encrypt(BYTE key)
 {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// 암호화 대상				(checkSum + Payload)
@@ -184,13 +187,13 @@ void NetPacket::Encrypt(void)
 		*byte ^= (P1 + header->randKey + i);
 		P1 = *byte;
 
-		*byte ^= (E1 + PACKET_SYMMETRIC_KEY + i);
+		*byte ^= (E1 + key + i);
 		E1 = *byte;
 
 		byte++;
 	}
 }
-void NetPacket::Decrypt(void)
+void NetPacket::Decrypt(BYTE key)
 {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// 복호화 대상				(checkSum + Payload)
@@ -219,7 +222,7 @@ void NetPacket::Decrypt(void)
 	for (int i = 1; i <= size; i++)
 	{
 		temp = *byte;
-		*byte ^= (E1 + PACKET_SYMMETRIC_KEY + i);
+		*byte ^= (E1 + key + i);
 		E1 = temp;
 
 		temp = *byte;
@@ -231,9 +234,6 @@ void NetPacket::Decrypt(void)
 }
 unsigned char NetPacket::MakeChecksum(void)
 {
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Payload 부분을 1byte 씩 모두 더해서 % 256 한 unsigned char 값
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
 	BYTE* byte = (BYTE*)GetFrontBufferPtr();
 	int size = GetUseSize();
 	int checkSum = 0;
@@ -254,6 +254,7 @@ NetPacket & NetPacket::operator=(const NetPacket & packet)
 	_front = _buffer + (packet._front - packet._buffer);
 	_header = _front;
 	_refCount = packet._refCount;
+	_encode = packet._encode;
 	memmove(_front, packet._front, packet._rear - packet._front);
 	return *this;
 }

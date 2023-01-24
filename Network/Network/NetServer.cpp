@@ -27,12 +27,14 @@ NetServer::~NetServer()
 {
 	WSACleanup();
 }
-bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, int timeoutSec, bool nagle)
+bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
 {
 	_workerCreateCnt = workerCreateCnt;
 	_workerRunningCnt = workerRunningCnt;
 	_sessionMax = sessionMax;
 	_timeoutSec = timeoutSec;
+	_packetCode = packetCode;
+	_packetKey = packetKey;
 	memset(&_curTPS, 0, sizeof(TPS));
 	memset(&_oldTPS, 0, sizeof(TPS));
 
@@ -442,15 +444,6 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 		}
 
 		//--------------------------------------------------------------------
-		// 패킷 코드 진위 여부 확인
-		//--------------------------------------------------------------------
-		if (header.code != PACKET_CODE)
-		{
-			DisconnectSession(session);
-			break;
-		}
-
-		//--------------------------------------------------------------------
 		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
 		//--------------------------------------------------------------------
 		if (session->recvQ.GetUseSize() < sizeof(header) + header.len)
@@ -481,9 +474,9 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼 디코딩 처리
 		//--------------------------------------------------------------------
-		if (!packet->Decode())
+		if (!packet->Decode(_packetCode, _packetKey))
 		{
-			OnError(NET_ERROR_DECRYPTION_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+			OnError(NET_ERROR_DECODE_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			DisconnectSession(session);
 			NetPacket::Free(packet);
 			break;
@@ -538,7 +531,7 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	// 직렬화 버퍼 인코딩 처리
 	//--------------------------------------------------------------------
-	packet->Encode();
+	packet->Encode(_packetCode, _packetKey);
 
 	//--------------------------------------------------------------------
 	// 송신용 큐에 직렬화 버퍼 담기
@@ -562,7 +555,7 @@ void NetServer::ClearSendPacket(SESSION* session)
 		// 전송 대기중이던 직렬화 버퍼 정리
 		//--------------------------------------------------------------------
 		packet = session->sendBuf[count];
-		NetPacket::Free(session->sendBuf[count]);
+		NetPacket::Free(packet);
 	}
 	session->sendBufCount = 0;
 
