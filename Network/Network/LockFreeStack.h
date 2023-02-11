@@ -22,7 +22,7 @@ namespace Jay
             NODE* prev;
         };
     public:
-        LockFreeStack() : _top(nullptr), _nodePool(0, true)
+        LockFreeStack() : _top(nullptr), _nodePool(0, false)
         {
         }
         ~LockFreeStack()

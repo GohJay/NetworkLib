@@ -19,6 +19,7 @@ void Control()
 		}
 	}
 }
+
 void Monitor()
 {
 	tm stTime;
@@ -44,15 +45,17 @@ Send TPS: %d\n\
 		, g_Server.GetRecvTPS()
 		, g_Server.GetSendTPS());
 }
+
 int main()
 {
+	timeBeginPeriod(1);
+
 	wchar_t ip[16] = L"0.0.0.0";
 	int port = 6000;
 	int workerCreateCnt = 4;
 	int workerRunningCnt = 0;
 	WORD sessionMax = 10000;
 
-	timeBeginPeriod(1);
 	if (g_Server.Start(ip, port, workerCreateCnt, workerRunningCnt, sessionMax))
 	{
 		while (!g_StopSignal)
@@ -63,9 +66,10 @@ int main()
 		}
 		g_Server.Stop();
 	}
-	timeEndPeriod(1);
 
 	wprintf_s(L"Press any key to continue . . . ");
 	_getwch();
+
+	timeEndPeriod(1);
 	return 0;
 }

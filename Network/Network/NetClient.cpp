@@ -413,6 +413,15 @@ void NetClient::CompleteRecvPacket(SESSION* session)
 		}
 
 		//--------------------------------------------------------------------
+		// Payload 크기가 설정해둔 최대 크기를 초과하는지 확인
+		//--------------------------------------------------------------------
+		if (header.len > MAX_PAYLOAD)
+		{
+			DisconnectSession(session);
+			break;
+		}
+
+		//--------------------------------------------------------------------
 		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
 		//--------------------------------------------------------------------
 		if (session->recvQ.GetUseSize() < sizeof(header) + header.len)
@@ -445,7 +454,6 @@ void NetClient::CompleteRecvPacket(SESSION* session)
 		//--------------------------------------------------------------------
 		if (!packet->Decode(_packetCode, _packetKey))
 		{
-			OnError(NET_ERROR_DECODE_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
 			DisconnectSession(session);
 			NetPacket::Free(packet);
 			break;
@@ -454,7 +462,7 @@ void NetClient::CompleteRecvPacket(SESSION* session)
 		try
 		{
 			//--------------------------------------------------------------------
-			// 컨텐츠 부에 Payload 를 담은 직렬화 버퍼 전달
+			// 컨텐츠 부에 직렬화 버퍼 전달
 			//--------------------------------------------------------------------
 			OnRecv(packet);
 		}

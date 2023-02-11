@@ -22,7 +22,7 @@ namespace Jay
             NODE* next;
         };
     public:
-        LockFreeQueue() : _count(0), _nodePool(0, true)
+        LockFreeQueue() : _count(0), _nodePool(0, false)
         {
             _head = _nodePool.Alloc();
             _head->next = nullptr;
@@ -50,6 +50,7 @@ namespace Jay
 
             node = _nodePool.Alloc();
             node->data = data;
+            node->next = nullptr;
 
             for (;;)
             {

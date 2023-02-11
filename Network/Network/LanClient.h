@@ -1,7 +1,7 @@
 #ifndef __LANCLIENT__H_
 #define __LANCLIENT__H_
 #include "Base.h"
-#include "define.h"
+#include "Define.h"
 #include "NetPacket.h"
 
 namespace Jay

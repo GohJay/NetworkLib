@@ -443,6 +443,15 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 		}
 
 		//--------------------------------------------------------------------
+		// Payload 크기가 설정해둔 최대 크기를 초과하는지 확인
+		//--------------------------------------------------------------------
+		if (header.len > MAX_PAYLOAD)
+		{
+			DisconnectSession(session);
+			break;
+		}
+		
+		//--------------------------------------------------------------------
 		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
 		//--------------------------------------------------------------------
 		if (session->recvQ.GetUseSize() < sizeof(header) + header.len)
@@ -484,7 +493,7 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 		try
 		{
 			//--------------------------------------------------------------------
-			// 컨텐츠 부에 Payload 를 담은 직렬화 버퍼 전달
+			// 컨텐츠 부에 직렬화 버퍼 전달
 			//--------------------------------------------------------------------
 			OnRecv(session->sessionID, packet);
 		}
@@ -543,6 +552,7 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
+	//SendPost(session);
 }
 void NetServer::ClearSendPacket(SESSION* session)
 {

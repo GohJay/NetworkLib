@@ -142,6 +142,7 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="LanClient.h" />
+    <ClInclude Include="Lock.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
     <ClInclude Include="NetClient.h" />
@@ -161,6 +162,7 @@
     <ClCompile Include="FileUtil.cpp" />
     <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanServer.cpp" />
+    <ClCompile Include="Lock.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="NetClient.cpp" />
     <ClCompile Include="NetPacket.cpp" />

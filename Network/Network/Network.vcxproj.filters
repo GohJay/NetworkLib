@@ -84,6 +84,9 @@
     <ClInclude Include="NetClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Lock.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
@@ -112,6 +115,9 @@
     </ClCompile>
     <ClCompile Include="NetClient.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Lock.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

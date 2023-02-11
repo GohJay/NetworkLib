@@ -1,5 +1,6 @@
 #ifndef __LOG__H_
 #define __LOG__H_
+#include "Lock.h"
 #include <Windows.h>
 
 #define LOG_LEVEL_DEBUG		0
@@ -15,8 +16,8 @@ namespace Jay
 		* @brief	File Logger Class
 		* @details	파일 로그 출력용 클래스
 		* @author   고재현
-		* @date		2022-12-24
-		* @version  1.0.2
+		* @date		2022-02-11
+		* @version  1.0.3
 		**/
 	private:
 		Logger();
@@ -32,7 +33,7 @@ namespace Jay
 		static DWORD _logIndex;
 		static int _logLevel;
 		static wchar_t _logPath[MAX_PATH];
-		static SRWLOCK _logLock;
+		static SRWLock _logLock;
 		static Logger _instance;
 	};
 }
