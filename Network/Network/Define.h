@@ -4,14 +4,14 @@
 #include "LockFreeQueue.h"
 #include "NetPacket.h"
 
-#define SESSIONID_INDEX_MASK			0x000000000000FFFF
-#define SESSIONID_KEY_MASK				0xFFFFFFFFFFFF0000
+#define SESSIONID_INDEX_MASK            0x000000000000FFFF
+#define SESSIONID_KEY_MASK              0xFFFFFFFFFFFF0000
 
 #define GET_SESSION_INDEX(sessionid)	((sessionid) & SESSIONID_INDEX_MASK)
-#define MAKE_SESSIONID(key, index)		((key) << 16) | (index)
+#define MAKE_SESSIONID(key, index)      ((key) << 16) | (index)
 
-#define MAX_SENDBUF						512
-#define MAX_PAYLOAD						1000
+#define MAX_SENDBUF                     512
+#define MAX_PAYLOAD                     1000
 
 struct TPS
 {
