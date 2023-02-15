@@ -143,10 +143,6 @@ int NetServer::GetUsePacketCount()
 {
 	return NetPacket::_packetPool.GetUseCount();
 }
-int NetServer::GetTotalAcceptCount()
-{
-	return _totalAcceptCnt;
-}
 int NetServer::GetAcceptTPS()
 {
 	return _oldTPS.accept;
@@ -158,6 +154,10 @@ int NetServer::GetRecvTPS()
 int NetServer::GetSendTPS()
 {
 	return _oldTPS.send;
+}
+__int64 NetServer::GetTotalAcceptCount()
+{
+	return _totalAcceptCnt;
 }
 SESSION* NetServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
@@ -759,9 +759,13 @@ bool NetServer::Initial()
 	}
 
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
-	_sessionArray = new SESSION[_sessionMax];
+	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
-	for (int index = _sessionMax - 1; index >= 0; index--)
+	int index;
+	for (index = 0; index < _sessionMax; index++)
+		new(&_sessionArray[index]) SESSION();
+
+	for (index = _sessionMax - 1; index >= 0; index--)
 		_indexStack.Push(index);
 
 	return true;
@@ -769,6 +773,9 @@ bool NetServer::Initial()
 void NetServer::Release()
 {
 	WORD index;
+	for (index = 0; index < _sessionMax; index++)
+		_sessionArray[index].~SESSION();
+
 	while (_indexStack.size() > 0)
 		_indexStack.Pop(index);
 
@@ -780,7 +787,7 @@ void NetServer::Release()
 		CloseHandle(_hWorkerThread[i]);
 
 	delete[] _hWorkerThread;
-	delete[] _sessionArray;
+	_aligned_free(_sessionArray);
 }
 unsigned int NetServer::AcceptThread()
 {
@@ -846,7 +853,7 @@ unsigned int NetServer::AcceptThread()
 		//--------------------------------------------------------------------
 		CloseSession(session);
 
-		InterlockedIncrement((LONG*)&_totalAcceptCnt);
+		_totalAcceptCnt++;
 		InterlockedIncrement(&_curTPS.accept);
 	}
 	return 0;

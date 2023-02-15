@@ -10,38 +10,41 @@
 #define GET_SESSION_INDEX(sessionid)	((sessionid) & SESSIONID_INDEX_MASK)
 #define MAKE_SESSIONID(key, index)		((key) << 16) | (index)
 
-#define MAX_SENDBUF						500
+#define MAX_SENDBUF						512
 #define MAX_PAYLOAD						1000
-
-struct SESSION
-{
-	union {
-		struct {
-			BOOL releaseFlag;
-			LONG ioCount;
-		};
-		LONGLONG release = TRUE;
-	};
-	OVERLAPPED recvOverlapped;
-	OVERLAPPED sendOverlapped;
-	DWORD64 sessionID;
-	SOCKET socket;
-	WCHAR ip[16];
-	INT port;
-	DWORD lastRecvTime;
-	Jay::RingBuffer recvQ;
-	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
-	Jay::NetPacket* sendBuf[MAX_SENDBUF];
-	LONG sendBufCount;
-	BOOL sendFlag;
-	BOOL disconnectFlag;
-};
 
 struct TPS
 {
 	LONG accept;
 	LONG recv;
 	LONG send;
+};
+
+struct alignas(64) SESSION
+{
+	union {
+		struct {
+			BOOL releaseFlag;
+			LONG ioCount;
+		};
+		LONGLONG release;
+	};
+	OVERLAPPED recvOverlapped;
+	OVERLAPPED sendOverlapped;
+	DWORD64 sessionID;
+	SOCKET socket;
+	WCHAR ip[16];
+	USHORT port;
+	DWORD lastRecvTime;
+	Jay::RingBuffer recvQ;
+	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
+	Jay::NetPacket** sendBuf;
+	LONG sendBufCount;
+	BOOL sendFlag;
+	BOOL disconnectFlag;
+	
+	SESSION() { release = TRUE, sendBuf = (Jay::NetPacket**)malloc(sizeof(void*) * MAX_SENDBUF); }
+	~SESSION() { free(sendBuf); }
 };
 
 #endif

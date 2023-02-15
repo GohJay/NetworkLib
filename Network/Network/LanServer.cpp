@@ -141,7 +141,7 @@ int LanServer::GetUsePacketCount()
 {
 	return NetPacket::_packetPool.GetUseCount();
 }
-int LanServer::GetTotalAcceptCount()
+__int64 LanServer::GetTotalAcceptCount()
 {
 	return _totalAcceptCnt;
 }
@@ -746,9 +746,13 @@ bool LanServer::Initial()
 	}
 
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
-	_sessionArray = new SESSION[_sessionMax];
+	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
-	for (int index = _sessionMax - 1; index >= 0; index--)
+	int index;
+	for (index = 0; index < _sessionMax; index++)
+		new(&_sessionArray[index]) SESSION();
+
+	for (index = _sessionMax - 1; index >= 0; index--)
 		_indexStack.Push(index);
 
 	return true;
@@ -756,6 +760,9 @@ bool LanServer::Initial()
 void LanServer::Release()
 {
 	WORD index;
+	for (index = 0; index < _sessionMax; index++)
+		_sessionArray[index].~SESSION();
+
 	while (_indexStack.size() > 0)
 		_indexStack.Pop(index);
 
@@ -767,7 +774,7 @@ void LanServer::Release()
 		CloseHandle(_hWorkerThread[i]);
 
 	delete[] _hWorkerThread;
-	delete[] _sessionArray;
+	_aligned_free(_sessionArray);
 }
 unsigned int LanServer::AcceptThread()
 {
@@ -833,7 +840,7 @@ unsigned int LanServer::AcceptThread()
 		//--------------------------------------------------------------------
 		CloseSession(session);
 
-		InterlockedIncrement((LONG*)&_totalAcceptCnt);
+		_totalAcceptCnt++;
 		InterlockedIncrement(&_curTPS.accept);
 	}
 	return 0;

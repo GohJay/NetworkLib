@@ -27,10 +27,10 @@ namespace Jay
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
 		int GetSessionCount();
 		int GetUsePacketCount();
-		int GetTotalAcceptCount();
 		int GetAcceptTPS();
 		int GetRecvTPS();
 		int GetSendTPS();
+		__int64 GetTotalAcceptCount();
 	protected:
 		virtual bool OnConnectionRequest(const wchar_t* ipaddress, int port) = 0;
 		virtual void OnClientJoin(DWORD64 sessionID) = 0;
@@ -81,7 +81,7 @@ namespace Jay
 		HANDLE _hExitThreadEvent;
 		DWORD _lastTimeoutProc;
 		int _timeoutSec;
-		int _totalAcceptCnt;
+		__int64 _totalAcceptCnt;
 		TPS _curTPS;
 		TPS _oldTPS;
 		BYTE _packetCode;
