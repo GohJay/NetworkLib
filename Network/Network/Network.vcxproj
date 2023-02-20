@@ -106,7 +106,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -124,7 +124,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -147,7 +147,9 @@
     <ClInclude Include="LockFreeStack.h" />
     <ClInclude Include="NetClient.h" />
     <ClInclude Include="NetException.h" />
+    <ClInclude Include="NetContent.h" />
     <ClInclude Include="NetServer.h" />
+    <ClInclude Include="NetServerEx.h" />
     <ClInclude Include="ObjectPool_TLS.h" />
     <ClInclude Include="User.h" />
     <ClInclude Include="LanServer.h" />
@@ -168,6 +170,7 @@
     <ClCompile Include="NetPacket.cpp" />
     <ClCompile Include="NetPacketPtr.cpp" />
     <ClCompile Include="NetServer.cpp" />
+    <ClCompile Include="NetServerEx.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

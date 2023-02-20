@@ -1,4 +1,4 @@
-#include "NetServer.h"
+#include "NetServerEx.h"
 #include "Error.h"
 #include "Protocol.h"
 #include "User.h"
@@ -12,21 +12,50 @@
 
 using namespace Jay;
 
-NetServer::NetServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0)
+NetServerEx::NetServerEx() : _sessionCnt(0), _sessionKey(0), _defaultContentIndex(0), _contentCnt(0), _lastTimeoutProc(0), _sessionJobPool(0), _contentJobPool(0)
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
 	if (status != 0)
-	{
 		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, status);
-		return;
-	}
+
+	_tlsContent = TlsAlloc();
+	if (_tlsContent == TLS_OUT_OF_INDEXES)
+		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, GetLastError());
 }
-NetServer::~NetServer()
+NetServerEx::~NetServerEx()
 {
+	TlsFree(_tlsContent);
 	WSACleanup();
 }
-bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
+void NetServerEx::AttachContent(NetContent* content, WORD contentID, WORD frameInterval, bool default)
+{
+	if (_contentCnt >= MAX_CONTENT)
+	{
+		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, MAX_CONTENT, _contentCnt);
+		return;
+	}
+
+	WORD index = _contentCnt++;
+	CONTENT_INFO* contentInfo = &_contentArray[index];
+	contentInfo->content = content;
+	contentInfo->contentID = contentID;
+	contentInfo->frameInterval = frameInterval;
+
+	if (default)
+		_defaultContentIndex = index;
+}
+bool NetServerEx::ChangeFrameInterval(WORD contentID, WORD frameInterval)
+{
+	CONTENT_INFO* contentInfo = FindContentInfo(contentID);
+	if (contentInfo != nullptr)
+	{
+		contentInfo->frameInterval = frameInterval;
+		return true;
+	}
+	return false;
+}
+bool NetServerEx::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
 {
 	_workerCreateCnt = workerCreateCnt;
 	_workerRunningCnt = workerRunningCnt;
@@ -54,6 +83,8 @@ bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 	//--------------------------------------------------------------------
 	// Thread Begin
 	//--------------------------------------------------------------------
+	for (int i = 0; i < _contentCnt; i++)
+		_hContentThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapContentThread, this, 0, (unsigned int*)&_contentArray[i].threadID);
 	for (int i = 0; i < _workerCreateCnt; i++)
 		_hWorkerThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapWorkerThread, this, 0, NULL);
 	_hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, WrapAcceptThread, this, 0, NULL);
@@ -61,7 +92,7 @@ bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 
 	return true;
 }
-void NetServer::Stop()
+void NetServerEx::Stop()
 {
 	//--------------------------------------------------------------------
 	// AcceptThread, ManagementThread 종료 신호 보내기
@@ -75,6 +106,13 @@ void NetServer::Stop()
 	HANDLE hHandle[2] = { _hAcceptThread, _hManagementThread };
 	DWORD ret;
 	ret = WaitForMultipleObjects(2, hHandle, TRUE, INFINITE);
+	if (ret == WAIT_FAILED)
+		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+
+	//--------------------------------------------------------------------
+	// ContentThread 종료 대기
+	//--------------------------------------------------------------------
+	ret = WaitForMultipleObjects(_contentCnt, _hContentThread, TRUE, INFINITE);
 	if (ret == WAIT_FAILED)
 		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
 
@@ -112,7 +150,7 @@ void NetServer::Stop()
 	//--------------------------------------------------------------------
 	Release();
 }
-bool NetServer::Disconnect(DWORD64 sessionID)
+bool NetServerEx::Disconnect(DWORD64 sessionID)
 {
 	SESSION* session = DuplicateSession(sessionID);
 	if (session != nullptr)
@@ -123,7 +161,7 @@ bool NetServer::Disconnect(DWORD64 sessionID)
 	}
 	return false;
 }
-bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
+bool NetServerEx::SendPacket(DWORD64 sessionID, NetPacket* packet)
 {
 	SESSION* session = DuplicateSession(sessionID);
 	if (session != nullptr)
@@ -134,31 +172,42 @@ bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
 	}
 	return false;
 }
-int NetServer::GetSessionCount()
+bool NetServerEx::MoveContent(DWORD64 sessionID, WORD contentID)
+{
+	SESSION* session = DuplicateSession(sessionID);
+	if (session != nullptr)
+	{
+		TryMoveContent(session, contentID);
+		CloseSession(session);
+		return true;
+	}
+	return false;
+}
+int NetServerEx::GetSessionCount()
 {
 	return _sessionCnt;
 }
-int NetServer::GetUsePacketCount()
+int NetServerEx::GetUsePacketCount()
 {
 	return NetPacket::_packetPool.GetUseCount();
 }
-int NetServer::GetAcceptTPS()
+int NetServerEx::GetAcceptTPS()
 {
 	return _monitoring.oldTPS.accept;
 }
-int NetServer::GetRecvTPS()
+int NetServerEx::GetRecvTPS()
 {
 	return _monitoring.oldTPS.recv;
 }
-int NetServer::GetSendTPS()
+int NetServerEx::GetSendTPS()
 {
 	return _monitoring.oldTPS.send;
 }
-__int64 NetServer::GetTotalAcceptCount()
+__int64 NetServerEx::GetTotalAcceptCount()
 {
 	return _monitoring.acceptTotal;
 }
-SESSION* NetServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
+SESSION* NetServerEx::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
 	WORD index;
 	if (!_indexStack.Pop(index))
@@ -184,7 +233,7 @@ SESSION* NetServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int p
 	InterlockedIncrement16((SHORT*)&_sessionCnt);
 	return session;
 }
-void NetServer::ReleaseSession(SESSION* session)
+void NetServerEx::ReleaseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
@@ -196,6 +245,7 @@ void NetServer::ReleaseSession(SESSION* session)
 	// 세션 자원 정리
 	//--------------------------------------------------------------------
 	ClearSendPacket(session);
+	ClearSessionJob(session);
 	closesocket(session->socket);
 
 	//--------------------------------------------------------------------
@@ -208,7 +258,7 @@ void NetServer::ReleaseSession(SESSION* session)
 
 	InterlockedDecrement16((SHORT*)&_sessionCnt);
 }
-void NetServer::DisconnectSession(SESSION* session)
+void NetServerEx::DisconnectSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 소켓에 현재 요청되어있는 모든 IO 를 중단
@@ -216,7 +266,7 @@ void NetServer::DisconnectSession(SESSION* session)
 	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == FALSE)
 		CancelIoEx((HANDLE)session->socket, NULL);
 }
-SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
+SESSION* NetServerEx::DuplicateSession(DWORD64 sessionID)
 {
 	WORD index = GET_SESSION_INDEX(sessionID);
 	SESSION* session = &_sessionArray[index];
@@ -248,7 +298,7 @@ SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
 
 	return nullptr;
 }
-void NetServer::CloseSession(SESSION* session)
+void NetServerEx::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 참조 세션 반환
@@ -256,7 +306,7 @@ void NetServer::CloseSession(SESSION* session)
 	if (InterlockedDecrement(&session->ioCount) == 0)
 		ReleaseSession(session);
 }
-void NetServer::RecvPost(SESSION* session)
+void NetServerEx::RecvPost(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// Disconnect Flag 가 켜져있을 경우 return
@@ -321,7 +371,7 @@ void NetServer::RecvPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
 	}
 }
-void NetServer::SendPost(SESSION* session)
+void NetServerEx::SendPost(SESSION* session)
 {
 	for (;;)
 	{
@@ -403,21 +453,21 @@ void NetServer::SendPost(SESSION* session)
 			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
 	}
 }
-void NetServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
+void NetServerEx::RecvRoutine(SESSION* session, DWORD cbTransferred)
 {
 	session->lastRecvTime = timeGetTime();
 	session->recvQ.MoveRear(cbTransferred);
 	CompleteRecvPacket(session);
 	RecvPost(session);
 }
-void NetServer::SendRoutine(SESSION* session, DWORD cbTransferred)
+void NetServerEx::SendRoutine(SESSION* session, DWORD cbTransferred)
 {
 	CompleteSendPacket(session);
 	InterlockedExchange((LONG*)&session->sendFlag, FALSE);
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
-void NetServer::CompleteRecvPacket(SESSION* session)
+void NetServerEx::CompleteRecvPacket(SESSION* session)
 {
 	NET_PACKET_HEADER header;
 	for (;;)
@@ -449,7 +499,7 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 			DisconnectSession(session);
 			break;
 		}
-		
+
 		//--------------------------------------------------------------------
 		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
 		//--------------------------------------------------------------------
@@ -477,7 +527,7 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 			break;
 		}
 		packet->MoveRear(ret);
-		
+
 		//--------------------------------------------------------------------
 		// 직렬화 버퍼 디코딩 처리
 		//--------------------------------------------------------------------
@@ -489,26 +539,25 @@ void NetServer::CompleteRecvPacket(SESSION* session)
 			break;
 		}
 
-		try
-		{
-			//--------------------------------------------------------------------
-			// 컨텐츠 부에 직렬화 버퍼 전달
-			//--------------------------------------------------------------------
-			OnRecv(session->sessionID, packet);
-		}
-		catch (NetException& ex)
-		{
-			OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
-			DisconnectSession(session);
-			NetPacket::Free(packet);
-			break;
-		}
+		//--------------------------------------------------------------------
+		// 오브젝트 풀에서 세션 Job 할당
+		//--------------------------------------------------------------------
+		SESSION_JOB* sessionJob = _sessionJobPool.Alloc();
+		sessionJob->type = JOB_TYPE_PACKET_RECV;
+		sessionJob->sessionID = session->sessionID;
+		sessionJob->packet = packet;
+
+		//--------------------------------------------------------------------
+		// 세션 Job 큐잉
+		//--------------------------------------------------------------------
+		packet->IncrementRefCount();
+		session->jobQ.Enqueue(sessionJob);
 
 		NetPacket::Free(packet);
 		InterlockedIncrement(&_monitoring.curTPS.recv);
 	}
 }
-void NetServer::CompleteSendPacket(SESSION* session)
+void NetServerEx::CompleteSendPacket(SESSION* session)
 {
 	//--------------------------------------------------------------------
 	// 전송 완료한 직렬화 버퍼 정리
@@ -524,7 +573,7 @@ void NetServer::CompleteSendPacket(SESSION* session)
 	InterlockedAdd(&_monitoring.curTPS.send, session->sendBufCount);
 	session->sendBufCount = 0;
 }
-void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
+void NetServerEx::TrySendPacket(SESSION* session, NetPacket* packet)
 {
 	int size = session->sendQ.size();
 	if (size > MAX_SENDBUF)
@@ -551,9 +600,8 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
-	//SendPost(session);
 }
-void NetServer::ClearSendPacket(SESSION* session)
+void NetServerEx::ClearSendPacket(SESSION* session)
 {
 	NetPacket* packet;
 	int count;
@@ -576,21 +624,37 @@ void NetServer::ClearSendPacket(SESSION* session)
 		NetPacket::Free(packet);
 	}
 }
-void NetServer::QueueUserMessage(DWORD message, LPVOID lpParam)
+void NetServerEx::ClearSessionJob(SESSION* session)
+{
+	SESSION_JOB* sessionJob;
+	while (session->jobQ.size() > 0)
+	{
+		//--------------------------------------------------------------------
+		// 세션 잡 큐에 남아있는 작업 정리
+		//--------------------------------------------------------------------
+		session->jobQ.Dequeue(sessionJob);
+
+		if (sessionJob->type == JOB_TYPE_PACKET_RECV)
+			NetPacket::Free(sessionJob->packet);
+
+		_sessionJobPool.Free(sessionJob);
+	}
+}
+void NetServerEx::QueueUserMessage(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// WorkerThread 에게 Job 요청
 	//--------------------------------------------------------------------
 	PostQueuedCompletionStatus(_hCompletionPort, message, (ULONG_PTR)lpParam, NULL);
 }
-void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
+void NetServerEx::UserMessageProc(DWORD message, LPVOID lpParam)
 {
 	//--------------------------------------------------------------------
 	// 다른 스레드로부터 요청받은 Job 처리
 	//--------------------------------------------------------------------
 	switch (message)
 	{
-	case UM_POST_SEND_PACKET:
+		case UM_POST_SEND_PACKET:
 		{
 			SESSION* session = (SESSION*)lpParam;
 			SendPost(session);
@@ -607,7 +671,7 @@ void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
 		break;
 	}
 }
-void NetServer::TimeoutProc()
+void NetServerEx::TimeoutProc()
 {
 	//--------------------------------------------------------------------
 	// 타임아웃 사용 옵션이 OFF일 경우 return
@@ -669,7 +733,7 @@ void NetServer::TimeoutProc()
 
 	_lastTimeoutProc = currentTime;
 }
-void NetServer::UpdateTPS()
+void NetServerEx::UpdateTPS()
 {
 	//--------------------------------------------------------------------
 	// 모니터링용 TPS 갱신
@@ -678,7 +742,175 @@ void NetServer::UpdateTPS()
 	_monitoring.oldTPS.recv = InterlockedExchange(&_monitoring.curTPS.recv, 0);
 	_monitoring.oldTPS.send = InterlockedExchange(&_monitoring.curTPS.send, 0);
 }
-bool NetServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
+void NetServerEx::TryMoveContent(SESSION* session, WORD contentID)
+{
+	CONTENT_INFO* destContentInfo = FindContentInfo(contentID);
+	if (destContentInfo != nullptr)
+	{
+		SESSION_JOB* sessionJob = _sessionJobPool.Alloc();
+		sessionJob->type = JOB_TYPE_SESSION_MOVE;
+		sessionJob->sessionID = session->sessionID;
+		sessionJob->destContentID = contentID;
+		session->jobQ.Enqueue(sessionJob);
+	}
+}
+NetServerEx::CONTENT_INFO* NetServerEx::FindContentInfo(WORD contentID)
+{
+	for (int index = 0; index < _contentCnt; index++)
+	{
+		if (_contentArray[index].contentID == contentID)
+			return &_contentArray[index];
+	}
+	return nullptr;
+}
+NetServerEx::CONTENT_INFO* NetServerEx::GetCurrentContentInfo()
+{
+	CONTENT_INFO* contentInfo = (CONTENT_INFO*)TlsGetValue(_tlsContent);
+	if (contentInfo == NULL)
+	{
+		DWORD threadID = GetCurrentThreadId();
+		for (int index = 0; index < _contentCnt; index++)
+		{
+			if (_contentArray[index].threadID == threadID)
+			{
+				contentInfo = &_contentArray[index];
+				TlsSetValue(_tlsContent, contentInfo);
+				break;
+			}
+		}
+	}
+	return contentInfo;
+}
+bool NetServerEx::ContentJobProc()
+{
+	//--------------------------------------------------------------------
+	// 컨텐츠 잡 큐 처리
+	//--------------------------------------------------------------------
+	CONTENT_INFO* contentInfo = GetCurrentContentInfo();
+	List<DWORD64>* sessionIDList = &contentInfo->sessionIDList;
+	NetContent* content = contentInfo->content;
+
+	CONTENT_JOB* contentJob;
+	while (contentInfo->jobQ.size())
+	{
+		contentInfo->jobQ.Dequeue(contentJob);
+
+		switch (contentJob->type)
+		{
+		case JOB_TYPE_CONTENT_JOIN:
+			//--------------------------------------------------------------------
+			// 컨텐츠 부에 접속 정보 알림
+			//--------------------------------------------------------------------
+			content->OnContentJoin(contentJob->sessionID);
+			sessionIDList->push_back(contentJob->sessionID);
+			break;
+		default:
+			break;
+		}
+
+		_contentJobPool.Free(contentJob);
+	}
+
+	return true;
+}
+bool NetServerEx::SessionJobProc(SESSION* session, NetContent* content)
+{
+	//--------------------------------------------------------------------
+	// 컨텐츠에 등록되어있는 세션들의 잡 큐 처리
+	//--------------------------------------------------------------------
+	bool ret = true;
+
+	SESSION_JOB* sessionJob;
+	while (session->jobQ.size() > 0 && ret)
+	{
+		session->jobQ.Dequeue(sessionJob);
+
+		switch (sessionJob->type)
+		{
+		case JOB_TYPE_PACKET_RECV:
+			{
+				try
+				{
+					//--------------------------------------------------------------------
+					// 컨텐츠 부에 직렬화 버퍼 전달
+					//--------------------------------------------------------------------
+					content->OnRecv(session->sessionID, sessionJob->packet);
+				}
+				catch (NetException& ex)
+				{
+					OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+					DisconnectSession(session);
+				}
+				NetPacket::Free(sessionJob->packet);
+			}
+			break;
+		case JOB_TYPE_SESSION_MOVE:
+			{
+				CONTENT_INFO* destContentInfo = FindContentInfo(sessionJob->destContentID);
+				if (content != destContentInfo->content)
+				{
+					content->OnContentLeave(session->sessionID);
+
+					//--------------------------------------------------------------------
+					// 컨텐츠 이동 정보 Job 큐잉
+					//--------------------------------------------------------------------
+					CONTENT_JOB* contentJob = _contentJobPool.Alloc();
+					contentJob->type = JOB_TYPE_CONTENT_JOIN;
+					contentJob->sessionID = session->sessionID;
+					destContentInfo->jobQ.Enqueue(contentJob);
+
+					ret = false;
+				}
+			}
+			break;
+		default:
+			break;
+		}
+
+		_sessionJobPool.Free(sessionJob);
+	}
+
+	return ret;
+}
+void NetServerEx::NotifyContent()
+{
+	CONTENT_INFO* contentInfo = GetCurrentContentInfo();
+	List<DWORD64>* sessionIDList = &contentInfo->sessionIDList;
+	NetContent* content = contentInfo->content;
+
+	//--------------------------------------------------------------------
+	// 컨텐츠 잡 큐 처리
+	//--------------------------------------------------------------------
+	ContentJobProc();
+
+	//--------------------------------------------------------------------
+	// 컨텐츠에 등록되어있는 세션들의 잡 큐 처리
+	//--------------------------------------------------------------------
+	for (auto iter = sessionIDList->begin(); iter != sessionIDList->end();)
+	{
+		DWORD64 sessionID = *iter;
+		SESSION* session = DuplicateSession(sessionID);
+		if (session == nullptr)
+		{
+			content->OnContentLeave(sessionID);
+			iter = sessionIDList->erase(iter);
+			continue;
+		}
+
+		if (!SessionJobProc(session, content))
+			iter = sessionIDList->erase(iter);
+		else
+			++iter;
+
+		CloseSession(session);
+	}
+
+	//--------------------------------------------------------------------
+	// 컨텐츠 업데이트 알림
+	//--------------------------------------------------------------------
+	content->OnUpdate();
+}
+bool NetServerEx::Listen(const wchar_t* ipaddress, int port, bool nagle)
 {
 	_listenSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (_listenSocket == INVALID_SOCKET)
@@ -733,12 +965,18 @@ bool NetServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 
 	return true;
 }
-bool NetServer::Initial()
+bool NetServerEx::Initial()
 {
 	size_t maxUserAddress = GetMaximumUserAddress();
 	if (maxUserAddress != MAXIMUM_ADDRESS_RANGE)
 	{
 		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, maxUserAddress);
+		return false;
+	}
+
+	if (_contentCnt < 1)
+	{
+		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, _contentCnt);
 		return false;
 	}
 
@@ -757,6 +995,7 @@ bool NetServer::Initial()
 		return false;
 	}
 
+	_hContentThread = new HANDLE[_contentCnt];
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
 	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
@@ -769,7 +1008,7 @@ bool NetServer::Initial()
 
 	return true;
 }
-void NetServer::Release()
+void NetServerEx::Release()
 {
 	WORD index;
 	for (index = 0; index < _sessionMax; index++)
@@ -778,6 +1017,17 @@ void NetServer::Release()
 	while (_indexStack.size() > 0)
 		_indexStack.Pop(index);
 
+	CONTENT_JOB* contentJob;
+	for (index = 0; index < _contentCnt; index++)
+	{
+		while (_contentArray->jobQ.size() > 0)
+		{
+			_contentArray->jobQ.Dequeue(contentJob);
+			_contentJobPool.Free(contentJob);
+		}
+		_contentArray->sessionIDList.clear();
+	}
+
 	CloseHandle(_hCompletionPort);
 	CloseHandle(_hExitThreadEvent);
 	CloseHandle(_hManagementThread);
@@ -785,10 +1035,11 @@ void NetServer::Release()
 	for (int i = 0; i < _workerCreateCnt; i++)
 		CloseHandle(_hWorkerThread[i]);
 
+	delete[] _hContentThread;
 	delete[] _hWorkerThread;
 	_aligned_free(_sessionArray);
 }
-unsigned int NetServer::AcceptThread()
+unsigned int NetServerEx::AcceptThread()
 {
 	for (;;)
 	{
@@ -842,6 +1093,14 @@ unsigned int NetServer::AcceptThread()
 		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
+		// Default 컨텐츠로 세션 이동
+		//--------------------------------------------------------------------
+		CONTENT_JOB* contentJob = _contentJobPool.Alloc();
+		contentJob->type = JOB_TYPE_CONTENT_JOIN;
+		contentJob->sessionID = session->sessionID;
+		_contentArray[_defaultContentIndex].jobQ.Enqueue(contentJob);
+
+		//--------------------------------------------------------------------
 		// 신규 접속자의 정보를 컨텐츠 부에 알리고 수신 등록
 		//--------------------------------------------------------------------
 		OnClientJoin(session->sessionID);
@@ -857,7 +1116,7 @@ unsigned int NetServer::AcceptThread()
 	}
 	return 0;
 }
-unsigned int NetServer::WorkerThread()
+unsigned int NetServerEx::WorkerThread()
 {
 	for (;;)
 	{
@@ -898,7 +1157,7 @@ unsigned int NetServer::WorkerThread()
 	}
 	return 0;
 }
-unsigned int NetServer::ManagementThread()
+unsigned int NetServerEx::ManagementThread()
 {
 	for (;;)
 	{
@@ -917,18 +1176,56 @@ unsigned int NetServer::ManagementThread()
 	}
 	return 0;
 }
-unsigned int __stdcall NetServer::WrapAcceptThread(LPVOID lpParam)
+unsigned int NetServerEx::ContentThread()
 {
-	NetServer* server = (NetServer*)lpParam;
+	CONTENT_INFO* contentInfo = GetCurrentContentInfo();
+	DWORD frameInterval = contentInfo->frameInterval;
+	DWORD timeout = frameInterval;
+	DWORD deltatime;
+	DWORD aftertime;
+	DWORD beforetime = timeGetTime();
+	
+	for (;;)
+	{
+		DWORD ret = WaitForSingleObject(_hExitThreadEvent, timeout);
+		switch (ret)
+		{
+		case WAIT_OBJECT_0:
+			return 0;
+		case WAIT_TIMEOUT:
+			// 컨텐츠 갱신
+			NotifyContent();
+
+			// 프레임 계산
+			aftertime = timeGetTime();
+			deltatime = aftertime - beforetime;
+			frameInterval = contentInfo->frameInterval;
+			timeout = (deltatime < frameInterval) ? frameInterval - deltatime : 0;
+			beforetime += frameInterval;
+			break;
+		default:
+			break;
+		}
+	}
+	return 0;
+}
+unsigned int __stdcall NetServerEx::WrapAcceptThread(LPVOID lpParam)
+{
+	NetServerEx* server = (NetServerEx*)lpParam;
 	return server->AcceptThread();
 }
-unsigned int __stdcall NetServer::WrapWorkerThread(LPVOID lpParam)
+unsigned int __stdcall NetServerEx::WrapWorkerThread(LPVOID lpParam)
 {
-	NetServer* server = (NetServer*)lpParam;
+	NetServerEx* server = (NetServerEx*)lpParam;
 	return server->WorkerThread();
 }
-unsigned int __stdcall NetServer::WrapManagementThread(LPVOID lpParam)
+unsigned int __stdcall NetServerEx::WrapManagementThread(LPVOID lpParam)
 {
-	NetServer* server = (NetServer*)lpParam;
+	NetServerEx* server = (NetServerEx*)lpParam;
 	return server->ManagementThread();
+}
+unsigned int __stdcall NetServerEx::WrapContentThread(LPVOID lpParam)
+{
+	NetServerEx* server = (NetServerEx*)lpParam;
+	return server->ContentThread();
 }

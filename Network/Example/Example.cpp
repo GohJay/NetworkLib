@@ -1,23 +1,53 @@
 #include "stdafx.h"
 #include "EchoServer.h"
+#include "EchoServerEx.h"
 #include <conio.h>
 #pragma comment(lib, "Winmm.lib")
 #pragma comment(lib, "Network.lib")
 
-EchoServer g_Server;
+EchoServerEx g_EchoServer;
+LoginServer g_LoginServer(&g_EchoServer);
+GameServer g_GameServer(&g_EchoServer);
 bool g_StopSignal = false;
 
-void Control()
+void Run();
+void Monitor();
+void Control();
+
+int main()
 {
-	wchar_t controlKey;
-	if (_kbhit())
+	timeBeginPeriod(1);
+
+	Run();
+
+	wprintf_s(L"Press any key to continue . . . ");
+	_getwch();
+
+	timeEndPeriod(1);
+	return 0;
+}
+
+void Run()
+{
+	wchar_t ip[16] = L"0.0.0.0";
+	int port = 40000;
+	int workerCreateCnt = 4;
+	int workerRunningCnt = 2;
+	WORD sessionMax = 60000;
+	BYTE packetCode = 119;
+	BYTE packetKey = 50;
+
+	if (!g_EchoServer.Start(ip, port, workerCreateCnt, workerRunningCnt, sessionMax, packetCode, packetKey))
+		return;
+
+	while (!g_StopSignal)
 	{
-		controlKey = _getwch();
-		if ((controlKey == L'q' || controlKey == L'Q'))
-		{
-			g_StopSignal = true;
-		}
+		Control();
+		Monitor();
+		Sleep(1000);
 	}
+
+	g_EchoServer.Stop();
 }
 
 void Monitor()
@@ -33,43 +63,35 @@ void Monitor()
 Session Count: %d\n\
 PacketPool Use: %d\n\
 ------------------------------------\n\
+Total Accept: %lld\n\
 Accept TPS: %d\n\
 Recv TPS: %d\n\
 Send TPS: %d\n\
 ------------------------------------\n\
-\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+AuthServer FPS: %d\n\
+GameServer FPS: %d\n\
+------------------------------------\n\
+\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec
-		, g_Server.GetSessionCount()
-		, g_Server.GetUsePacketCount()
-		, g_Server.GetAcceptTPS()
-		, g_Server.GetRecvTPS()
-		, g_Server.GetSendTPS());
+		, g_EchoServer.GetSessionCount()
+		, g_EchoServer.GetUsePacketCount()
+		, g_EchoServer.GetTotalAcceptCount()
+		, g_EchoServer.GetAcceptTPS()
+		, g_EchoServer.GetRecvTPS()
+		, g_EchoServer.GetSendTPS()
+		, g_LoginServer.GetFPS()
+		, g_GameServer.GetFPS());
 }
 
-int main()
+void Control()
 {
-	timeBeginPeriod(1);
-
-	wchar_t ip[16] = L"0.0.0.0";
-	int port = 6000;
-	int workerCreateCnt = 4;
-	int workerRunningCnt = 0;
-	WORD sessionMax = 10000;
-
-	if (g_Server.Start(ip, port, workerCreateCnt, workerRunningCnt, sessionMax))
+	wchar_t controlKey;
+	if (_kbhit())
 	{
-		while (!g_StopSignal)
+		controlKey = _getwch();
+		if ((controlKey == L'q' || controlKey == L'Q'))
 		{
-			Control();
-			Monitor();
-			Sleep(1000);
+			g_StopSignal = true;
 		}
-		g_Server.Stop();
 	}
-
-	wprintf_s(L"Press any key to continue . . . ");
-	_getwch();
-
-	timeEndPeriod(1);
-	return 0;
 }

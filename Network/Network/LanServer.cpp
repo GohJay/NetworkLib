@@ -12,7 +12,7 @@
 
 using namespace Jay;
 
-LanServer::LanServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0), _totalAcceptCnt(0)
+LanServer::LanServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0)
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
@@ -32,8 +32,7 @@ bool LanServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 	_workerRunningCnt = workerRunningCnt;
 	_sessionMax = sessionMax;
 	_timeoutSec = timeoutSec;
-	memset(&_curTPS, 0, sizeof(TPS));
-	memset(&_oldTPS, 0, sizeof(TPS));
+	ZeroMemory(&_monitoring, sizeof(MONITORING));
 
 	//--------------------------------------------------------------------
 	// Listen
@@ -143,19 +142,19 @@ int LanServer::GetUsePacketCount()
 }
 __int64 LanServer::GetTotalAcceptCount()
 {
-	return _totalAcceptCnt;
+	return _monitoring.acceptTotal;
 }
 int LanServer::GetAcceptTPS()
 {
-	return _oldTPS.accept;
+	return _monitoring.oldTPS.accept;
 }
 int LanServer::GetRecvTPS()
 {
-	return _oldTPS.recv;
+	return _monitoring.oldTPS.recv;
 }
 int LanServer::GetSendTPS()
 {
-	return _oldTPS.send;
+	return _monitoring.oldTPS.send;
 }
 SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
 {
@@ -492,7 +491,7 @@ void LanServer::CompleteRecvPacket(SESSION* session)
 		}
 
 		NetPacket::Free(packet);
-		InterlockedIncrement(&_curTPS.recv);
+		InterlockedIncrement(&_monitoring.curTPS.recv);
 	}
 }
 void LanServer::CompleteSendPacket(SESSION* session)
@@ -508,7 +507,7 @@ void LanServer::CompleteSendPacket(SESSION* session)
 		NetPacket::Free(packet);
 	}
 
-	InterlockedAdd(&_curTPS.send, session->sendBufCount);
+	InterlockedAdd(&_monitoring.curTPS.send, session->sendBufCount);
 	session->sendBufCount = 0;
 }
 void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
@@ -662,9 +661,9 @@ void LanServer::UpdateTPS()
 	//--------------------------------------------------------------------
 	// 모니터링용 TPS 갱신
 	//--------------------------------------------------------------------
-	_oldTPS.accept = InterlockedExchange(&_curTPS.accept, 0);
-	_oldTPS.recv = InterlockedExchange(&_curTPS.recv, 0);
-	_oldTPS.send = InterlockedExchange(&_curTPS.send, 0);
+	_monitoring.oldTPS.accept = InterlockedExchange(&_monitoring.curTPS.accept, 0);
+	_monitoring.oldTPS.recv = InterlockedExchange(&_monitoring.curTPS.recv, 0);
+	_monitoring.oldTPS.send = InterlockedExchange(&_monitoring.curTPS.send, 0);
 }
 bool LanServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 {
@@ -840,8 +839,8 @@ unsigned int LanServer::AcceptThread()
 		//--------------------------------------------------------------------
 		CloseSession(session);
 
-		_totalAcceptCnt++;
-		InterlockedIncrement(&_curTPS.accept);
+		_monitoring.acceptTotal++;
+		InterlockedIncrement(&_monitoring.curTPS.accept);
 	}
 	return 0;
 }

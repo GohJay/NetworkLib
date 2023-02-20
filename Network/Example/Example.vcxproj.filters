@@ -33,6 +33,12 @@
     <ClInclude Include="CrashDump.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="EchoServerEx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonProtocol.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -46,6 +52,9 @@
     </ClCompile>
     <ClCompile Include="CrashDump.cpp">
       <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="EchoServerEx.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

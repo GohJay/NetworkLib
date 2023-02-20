@@ -7,9 +7,9 @@ public:
 	EchoServer();
 	~EchoServer();
 private:
-	bool OnConnectionRequest(const wchar_t* ipaddress, int port);
-	void OnClientJoin(DWORD64 sessionID);
-	void OnClientLeave(DWORD64 sessionID);
-	void OnRecv(DWORD64 sessionID, Jay::NetPacket* packet);
-	void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam);
+	bool OnConnectionRequest(const wchar_t* ipaddress, int port) override;
+	void OnClientJoin(DWORD64 sessionID) override;
+	void OnClientLeave(DWORD64 sessionID) override;
+	void OnRecv(DWORD64 sessionID, Jay::NetPacket* packet) override;
+	void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) override;
 };

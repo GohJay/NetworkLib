@@ -81,9 +81,7 @@ namespace Jay
 		HANDLE _hExitThreadEvent;
 		DWORD _lastTimeoutProc;
 		int _timeoutSec;
-		__int64 _totalAcceptCnt;
-		TPS _curTPS;
-		TPS _oldTPS;
+		MONITORING _monitoring;
 	};
 }
 

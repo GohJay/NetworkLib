@@ -87,6 +87,12 @@
     <ClInclude Include="Lock.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="NetServerEx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NetContent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
@@ -118,6 +124,9 @@
     </ClCompile>
     <ClCompile Include="Lock.cpp">
       <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="NetServerEx.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
