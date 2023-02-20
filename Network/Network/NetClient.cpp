@@ -582,11 +582,20 @@ unsigned int NetClient::WorkerThread()
 		OVERLAPPED* overlapped = NULL;
 
 		BOOL ret = GetQueuedCompletionStatus(_hCompletionPort, &cbTransferred, (PULONG_PTR)&session, (LPOVERLAPPED*)&overlapped, INFINITE);
-		if (session == NULL && cbTransferred == 0 && overlapped == NULL)
+		if (overlapped == NULL)
 		{
-			// 종료 신호가 오면 스레드를 종료
-			PostQueuedCompletionStatus(_hCompletionPort, 0, NULL, NULL);
-			break;
+			if (session == NULL && cbTransferred == 0)
+			{
+				// 종료 신호가 오면 스레드를 종료
+				PostQueuedCompletionStatus(_hCompletionPort, 0, NULL, NULL);
+				break;
+			}
+			else
+			{
+				// 다른 스레드에게 받은 비동기 메시지 처리
+				UserMessageProc(cbTransferred, (LPVOID)session);
+				continue;
+			}
 		}
 
 		if (cbTransferred != 0)
@@ -600,12 +609,6 @@ unsigned int NetClient::WorkerThread()
 			{
 				// Send 완료 통지 처리
 				SendRoutine(session, cbTransferred);
-			}
-			else
-			{
-				// 다른 스레드에게 받은 비동기 메시지 처리
-				UserMessageProc(cbTransferred, (LPVOID)session);
-				continue;
 			}
 		}
 
