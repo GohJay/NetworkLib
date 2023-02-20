@@ -279,7 +279,7 @@ void NetServer::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(&session->recvOverlapped, sizeof(session->recvOverlapped));
+	ZeroMemory(session->recvOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaBuf[2];
 
 	wsaBuf[0].len = directSize;
@@ -292,7 +292,7 @@ void NetServer::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaBuf, 2, NULL, &flag, session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -318,7 +318,7 @@ void NetServer::RecvPost(SESSION* session)
 		// WSARecv 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
+			CancelIoEx((HANDLE)session->socket, session->recvOverlapped);
 	}
 }
 void NetServer::SendPost(SESSION* session)
@@ -351,7 +351,7 @@ void NetServer::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(&session->sendOverlapped, sizeof(session->sendOverlapped));
+	ZeroMemory(session->sendOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaBuf[MAX_SENDBUF];
 
 	//--------------------------------------------------------------------
@@ -374,7 +374,7 @@ void NetServer::SendPost(SESSION* session)
 	// WSASend 처리
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
-	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, &session->sendOverlapped, NULL);
+	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -400,7 +400,7 @@ void NetServer::SendPost(SESSION* session)
 		// WSASend 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
+			CancelIoEx((HANDLE)session->socket, session->sendOverlapped);
 	}
 }
 void NetServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
@@ -551,7 +551,6 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
-	//SendPost(session);
 }
 void NetServer::ClearSendPacket(SESSION* session)
 {
@@ -772,11 +771,11 @@ bool NetServer::Initial()
 void NetServer::Release()
 {
 	WORD index;
-	for (index = 0; index < _sessionMax; index++)
-		_sessionArray[index].~SESSION();
-
 	while (_indexStack.size() > 0)
 		_indexStack.Pop(index);
+
+	for (index = 0; index < _sessionMax; index++)
+		_sessionArray[index].~SESSION();
 
 	CloseHandle(_hCompletionPort);
 	CloseHandle(_hExitThreadEvent);
@@ -785,8 +784,8 @@ void NetServer::Release()
 	for (int i = 0; i < _workerCreateCnt; i++)
 		CloseHandle(_hWorkerThread[i]);
 
-	delete[] _hWorkerThread;
 	_aligned_free(_sessionArray);
+	delete[] _hWorkerThread;
 }
 unsigned int NetServer::AcceptThread()
 {
@@ -873,23 +872,24 @@ unsigned int NetServer::WorkerThread()
 			break;
 		}
 
+		if (overlapped == NULL)
+		{
+			// 다른 스레드에게 받은 비동기 메시지 처리
+			UserMessageProc(cbTransferred, (LPVOID)session);
+			continue;
+		}
+
 		if (cbTransferred != 0)
 		{
-			if (&session->recvOverlapped == overlapped)
+			if (session->recvOverlapped == overlapped)
 			{
 				// Recv 완료 통지 처리
 				RecvRoutine(session, cbTransferred);
 			}
-			else if (&session->sendOverlapped == overlapped)
+			else if (session->sendOverlapped == overlapped)
 			{
 				// Send 완료 통지 처리
 				SendRoutine(session, cbTransferred);
-			}
-			else
-			{
-				// 다른 스레드에게 받은 비동기 메시지 처리
-				UserMessageProc(cbTransferred, (LPVOID)session);
-				continue;
 			}
 		}
 

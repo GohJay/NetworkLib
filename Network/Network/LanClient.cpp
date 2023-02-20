@@ -249,7 +249,7 @@ void LanClient::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(&session->recvOverlapped, sizeof(session->recvOverlapped));
+	ZeroMemory(session->recvOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaRecvBuf[2];
 	wsaRecvBuf[0].buf = session->recvQ.GetRearBufferPtr();
 	wsaRecvBuf[0].len = directSize;
@@ -261,7 +261,7 @@ void LanClient::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -287,7 +287,7 @@ void LanClient::RecvPost(SESSION* session)
 		// WSARecv 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
+			CancelIoEx((HANDLE)session->socket, session->recvOverlapped);
 	}
 }
 void LanClient::SendPost(SESSION* session)
@@ -320,7 +320,7 @@ void LanClient::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(&session->sendOverlapped, sizeof(session->sendOverlapped));
+	ZeroMemory(session->sendOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaBuf[MAX_SENDBUF];
 
 	//--------------------------------------------------------------------
@@ -343,7 +343,7 @@ void LanClient::SendPost(SESSION* session)
 	// WSASend 처리
 	//--------------------------------------------------------------------
 	InterlockedIncrement(&session->ioCount);
-	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, &session->sendOverlapped, NULL);
+	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -369,7 +369,7 @@ void LanClient::SendPost(SESSION* session)
 		// WSASend 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
+			CancelIoEx((HANDLE)session->socket, session->sendOverlapped);
 	}
 }
 void LanClient::RecvRoutine(SESSION* session, DWORD cbTransferred)
@@ -580,12 +580,12 @@ unsigned int LanClient::WorkerThread()
 
 		if (cbTransferred != 0)
 		{
-			if (&session->recvOverlapped == overlapped)
+			if (session->recvOverlapped == overlapped)
 			{
 				// Recv 완료 통지 처리
 				RecvRoutine(session, cbTransferred);
 			}
-			else if (&session->sendOverlapped == overlapped)
+			else if (session->sendOverlapped == overlapped)
 			{
 				// Send 완료 통지 처리
 				SendRoutine(session, cbTransferred);

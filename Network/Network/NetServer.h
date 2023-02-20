@@ -56,7 +56,6 @@ namespace Jay
 		void TimeoutProc();
 		void UpdateTPS();
 	private:
-
 		bool Listen(const wchar_t* ipaddress, int port, bool nagle);
 		bool Initial();
 		void Release();

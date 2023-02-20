@@ -37,8 +37,8 @@ struct alignas(64) SESSION
 		};
 		LONGLONG release;
 	};
-	OVERLAPPED recvOverlapped;
-	OVERLAPPED sendOverlapped;
+	OVERLAPPED* recvOverlapped;
+	OVERLAPPED* sendOverlapped;
 	DWORD64 sessionID;
 	SOCKET socket;
 	WCHAR ip[16];
@@ -51,9 +51,18 @@ struct alignas(64) SESSION
 	Jay::RingBuffer recvQ;
 	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
 	Jay::LockFreeQueue<SESSION_JOB*> jobQ;
-	
-	SESSION() { release = TRUE, sendBuf = (Jay::NetPacket**)malloc(sizeof(void*) * MAX_SENDBUF); }
-	~SESSION() { free(sendBuf); }
+
+	SESSION() {
+		release = TRUE;
+		recvOverlapped = (OVERLAPPED*)malloc(sizeof(OVERLAPPED));
+		sendOverlapped = (OVERLAPPED*)malloc(sizeof(OVERLAPPED));
+		sendBuf = (Jay::NetPacket**)malloc(sizeof(void*) * MAX_SENDBUF);
+	}
+	~SESSION() {
+		free(recvOverlapped);
+		free(sendOverlapped);
+		free(sendBuf);
+	}
 };
 
 struct TPS
