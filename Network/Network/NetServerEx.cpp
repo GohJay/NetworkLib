@@ -1026,6 +1026,8 @@ void NetServerEx::Release()
 	CloseHandle(_hAcceptThread);
 	for (int i = 0; i < _workerCreateCnt; i++)
 		CloseHandle(_hWorkerThread[i]);
+	for (int i = 0; i < _contentCnt; i++)
+		CloseHandle(_hContentThread[i]);
 
 	_aligned_free(_sessionArray);
 	delete[] _hWorkerThread;
