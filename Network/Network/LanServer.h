@@ -38,7 +38,7 @@ namespace Jay
 		virtual void OnRecv(DWORD64 sessionID, NetPacket* packet) = 0;
 		virtual void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) = 0;
 	private:
-		SESSION* CreateSession(SOCKET socket, const wchar_t* ipaddress, int port);
+		SESSION* CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr);
 		void ReleaseSession(SESSION* session);
 		void DisconnectSession(SESSION* session);
 		SESSION* DuplicateSession(DWORD64 sessionID);

@@ -156,7 +156,7 @@ int LanServer::GetSendTPS()
 {
 	return _monitoring.oldTPS.send;
 }
-SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
+SESSION* LanServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 {
 	WORD index;
 	if (!_indexStack.Pop(index))
@@ -167,10 +167,10 @@ SESSION* LanServer::CreateSession(SOCKET socket, const wchar_t* ipaddress, int p
 	}
 
 	SESSION* session = &_sessionArray[index];
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
+
+	memmove(&session->socketAddr, socketAddr, sizeof(SOCKADDR_IN));
 	session->socket = socket;
-	wcscpy_s(session->ip, ipaddress);
-	session->port = port;
 	session->lastRecvTime = timeGetTime();
 	session->recvQ.ClearBuffer();
 	session->sendBufCount = 0;
@@ -187,7 +187,7 @@ void LanServer::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
 	//--------------------------------------------------------------------
-	if (InterlockedCompareExchange64(&session->release, TRUE, FALSE) != FALSE)
+	if (InterlockedCompareExchange(&session->release, TRUE, FALSE) != FALSE)
 		return;
 
 	//--------------------------------------------------------------------
@@ -211,7 +211,7 @@ void LanServer::DisconnectSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 소켓에 현재 요청되어있는 모든 IO 를 중단
 	//--------------------------------------------------------------------
-	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == FALSE)
+	if (InterlockedExchange8(&session->disconnectFlag, TRUE) == FALSE)
 		CancelIoEx((HANDLE)session->socket, NULL);
 }
 SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
@@ -219,7 +219,7 @@ SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
 	WORD index = GET_SESSION_INDEX(sessionID);
 	SESSION* session = &_sessionArray[index];
 
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
 
 	do
 	{
@@ -241,7 +241,7 @@ SESSION* LanServer::DuplicateSession(DWORD64 sessionID)
 		return session;
 	} while (0);
 
-	if (InterlockedDecrement(&session->ioCount) == 0)
+	if (InterlockedDecrement16(&session->ioCount) == 0)
 		ReleaseSession(session);
 
 	return nullptr;
@@ -251,7 +251,7 @@ void LanServer::CloseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 참조 세션 반환
 	//--------------------------------------------------------------------
-	if (InterlockedDecrement(&session->ioCount) == 0)
+	if (InterlockedDecrement16(&session->ioCount) == 0)
 		ReleaseSession(session);
 }
 void LanServer::RecvPost(SESSION* session)
@@ -277,7 +277,7 @@ void LanServer::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(session->recvOverlapped, sizeof(OVERLAPPED));
+	ZeroMemory(&session->recvOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaRecvBuf[2];
 	wsaRecvBuf[0].buf = session->recvQ.GetRearBufferPtr();
 	wsaRecvBuf[0].len = directSize;
@@ -287,9 +287,9 @@ void LanServer::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -306,7 +306,7 @@ void LanServer::RecvPost(SESSION* session)
 			}
 
 			// ioCount가 0이라면 연결 끊기
-			if (InterlockedDecrement(&session->ioCount) == 0)
+			if (InterlockedDecrement16(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
 		}
@@ -315,7 +315,7 @@ void LanServer::RecvPost(SESSION* session)
 		// WSARecv 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, session->recvOverlapped);
+			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
 	}
 }
 void LanServer::SendPost(SESSION* session)
@@ -331,7 +331,7 @@ void LanServer::SendPost(SESSION* session)
 		//--------------------------------------------------------------------
 		// 이미 전송 중인 Send 건이 있으면 return
 		//--------------------------------------------------------------------
-		if (InterlockedExchange((LONG*)&session->sendFlag, TRUE) == TRUE)
+		if (InterlockedExchange8(&session->sendFlag, TRUE) == TRUE)
 			return;
 
 		if (session->sendQ.size() > 0)
@@ -340,7 +340,7 @@ void LanServer::SendPost(SESSION* session)
 		//--------------------------------------------------------------------
 		// 전송할 데이터가 있는지 재차 확인 후 없으면 return
 		//--------------------------------------------------------------------
-		InterlockedExchange((LONG*)&session->sendFlag, FALSE);
+		InterlockedExchange8(&session->sendFlag, FALSE);
 		if (session->sendQ.size() <= 0)
 			return;
 	}
@@ -348,7 +348,7 @@ void LanServer::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(session->sendOverlapped, sizeof(OVERLAPPED));
+	ZeroMemory(&session->sendOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaBuf[MAX_SENDBUF];
 
 	//--------------------------------------------------------------------
@@ -370,8 +370,8 @@ void LanServer::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
-	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, session->sendOverlapped, NULL);
+	InterlockedIncrement16(&session->ioCount);
+	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, &session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -388,7 +388,7 @@ void LanServer::SendPost(SESSION* session)
 			}
 
 			// ioCount가 0이라면 연결 끊기
-			if (InterlockedDecrement(&session->ioCount) == 0)
+			if (InterlockedDecrement16(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
 		}
@@ -397,7 +397,7 @@ void LanServer::SendPost(SESSION* session)
 		// WSASend 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, session->sendOverlapped);
+			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
 	}
 }
 void LanServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
@@ -410,7 +410,7 @@ void LanServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
 void LanServer::SendRoutine(SESSION* session, DWORD cbTransferred)
 {
 	CompleteSendPacket(session);
-	InterlockedExchange((LONG*)&session->sendFlag, FALSE);
+	InterlockedExchange8(&session->sendFlag, FALSE);
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
@@ -537,7 +537,7 @@ void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	// 송신 요청
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
 void LanServer::ClearSendPacket(SESSION* session)
@@ -628,7 +628,7 @@ void LanServer::TimeoutProc()
 		if (session->lastRecvTime > timeout)
 			continue;
 
-		InterlockedIncrement(&session->ioCount);
+		InterlockedIncrement16(&session->ioCount);
 
 		do
 		{
@@ -650,7 +650,7 @@ void LanServer::TimeoutProc()
 			DisconnectSession(session);
 		} while (0);
 
-		if (InterlockedDecrement(&session->ioCount) == 0)
+		if (InterlockedDecrement16(&session->ioCount) == 0)
 			ReleaseSession(session);
 	}
 
@@ -779,15 +779,15 @@ unsigned int LanServer::AcceptThread()
 {
 	for (;;)
 	{
-		SOCKADDR_IN clientAddr;
-		int clientSize = sizeof(clientAddr);
-		ZeroMemory(&clientAddr, clientSize);
+		SOCKADDR_IN socketAddr;
+		int socketAddrSize = sizeof(socketAddr);
+		ZeroMemory(&socketAddr, socketAddrSize);
 
 		//--------------------------------------------------------------------
 		// Accept 처리. 처리할 것이 없다면 Block
 		//--------------------------------------------------------------------
-		SOCKET client = accept(_listenSocket, (SOCKADDR*)&clientAddr, &clientSize);
-		if (client == INVALID_SOCKET)
+		SOCKET socket = accept(_listenSocket, (SOCKADDR*)&socketAddr, &socketAddrSize);
+		if (socket == INVALID_SOCKET)
 			break;
 
 		//--------------------------------------------------------------------
@@ -795,7 +795,7 @@ unsigned int LanServer::AcceptThread()
 		//--------------------------------------------------------------------
 		if (_sessionCnt >= _sessionMax)
 		{
-			closesocket(client);
+			closesocket(socket);
 			continue;
 		}
 
@@ -804,22 +804,22 @@ unsigned int LanServer::AcceptThread()
 		//--------------------------------------------------------------------
 		wchar_t ip[16];
 		int port;
-		InetNtop(AF_INET, &clientAddr.sin_addr, ip, sizeof(ip) / 2);
-		port = ntohs(clientAddr.sin_port);
+		InetNtop(AF_INET, &socketAddr.sin_addr, ip, sizeof(ip) / 2);
+		port = ntohs(socketAddr.sin_port);
 		if (!OnConnectionRequest(ip, port))
 		{
 			// 컨텐츠 부에서 접속을 허용하지 않는다면 연결을 끊는다.
-			closesocket(client);
+			closesocket(socket);
 			continue;
 		}
 
 		//--------------------------------------------------------------------
 		// 신규 접속자의 세션 할당
 		//--------------------------------------------------------------------
-		SESSION* session = CreateSession(client, ip, port);
+		SESSION* session = CreateSession(socket, &socketAddr);
 		if (session == nullptr)
 		{
-			closesocket(client);
+			closesocket(socket);
 			continue;
 		}
 
@@ -871,19 +871,19 @@ unsigned int LanServer::WorkerThread()
 
 		if (cbTransferred != 0)
 		{
-			if (session->recvOverlapped == overlapped)
+			if (&session->recvOverlapped == overlapped)
 			{
 				// Recv 완료 통지 처리
 				RecvRoutine(session, cbTransferred);
 			}
-			else if (session->sendOverlapped == overlapped)
+			else if (&session->sendOverlapped == overlapped)
 			{
 				// Send 완료 통지 처리
 				SendRoutine(session, cbTransferred);
 			}
 		}
 
-		if (InterlockedDecrement(&session->ioCount) == 0)
+		if (InterlockedDecrement16(&session->ioCount) == 0)
 			ReleaseSession(session);
 	}
 	return 0;

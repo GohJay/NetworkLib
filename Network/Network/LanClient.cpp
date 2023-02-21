@@ -75,11 +75,11 @@ bool LanClient::Connect(const wchar_t* ipaddress, int port, bool nagle)
 		return false;
 	}
 
-	SOCKADDR_IN svrAddr;
-	ZeroMemory(&svrAddr, sizeof(svrAddr));
-	svrAddr.sin_family = AF_INET;
-	svrAddr.sin_port = htons(port);
-	InetPton(AF_INET, ipaddress, &svrAddr.sin_addr);
+	SOCKADDR_IN sockAddr;
+	ZeroMemory(&sockAddr, sizeof(sockAddr));
+	sockAddr.sin_family = AF_INET;
+	sockAddr.sin_port = htons(port);
+	InetPton(AF_INET, ipaddress, &sockAddr.sin_addr);
 
 	//--------------------------------------------------------------------
 	// 연결에 사용할 소켓 할당
@@ -108,7 +108,7 @@ bool LanClient::Connect(const wchar_t* ipaddress, int port, bool nagle)
 	//--------------------------------------------------------------------
 	// 서버에 연결
 	//--------------------------------------------------------------------
-	ret = connect(sock, (SOCKADDR*)&svrAddr, sizeof(svrAddr));
+	ret = connect(sock, (SOCKADDR*)&sockAddr, sizeof(sockAddr));
 	if (ret == SOCKET_ERROR)
 	{
 		OnError(NET_ERROR_CONNECT_ERROR, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
@@ -119,7 +119,7 @@ bool LanClient::Connect(const wchar_t* ipaddress, int port, bool nagle)
 	//--------------------------------------------------------------------
 	// 세션 할당
 	//--------------------------------------------------------------------
-	SESSION* session = CreateSession(sock, ipaddress, port);
+	SESSION* session = CreateSession(sock, &sockAddr);
 
 	//--------------------------------------------------------------------
 	// 할당된 세션을 IOCP에 등록
@@ -160,12 +160,11 @@ bool LanClient::SendPacket(NetPacket* packet)
 	}
 	return false;
 }
-SESSION* LanClient::CreateSession(SOCKET socket, const wchar_t* ipaddress, int port)
+SESSION* LanClient::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 {
-	InterlockedIncrement(&_session.ioCount);
+	InterlockedIncrement16(&_session.ioCount);
+	memmove(&_session.socketAddr, socketAddr, sizeof(SOCKADDR_IN));
 	_session.socket = socket;
-	wcscpy_s(_session.ip, ipaddress);
-	_session.port = port;
 	_session.recvQ.ClearBuffer();
 	_session.sendBufCount = 0;
 	_session.sendFlag = FALSE;
@@ -178,7 +177,7 @@ void LanClient::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
 	//--------------------------------------------------------------------
-	if (InterlockedCompareExchange64(&session->release, TRUE, FALSE) != FALSE)
+	if (InterlockedCompareExchange(&session->release, TRUE, FALSE) != FALSE)
 		return;
 
 	//--------------------------------------------------------------------
@@ -194,7 +193,7 @@ void LanClient::ReleaseSession(SESSION* session)
 }
 SESSION* LanClient::DuplicateSession()
 {
-	InterlockedIncrement(&_session.ioCount);
+	InterlockedIncrement16(&_session.ioCount);
 	
 	//--------------------------------------------------------------------
 	// 릴리즈된 세션인지 확인
@@ -205,7 +204,7 @@ SESSION* LanClient::DuplicateSession()
 		return &_session;
 	}
 
-	if (InterlockedDecrement(&_session.ioCount) == 0)
+	if (InterlockedDecrement16(&_session.ioCount) == 0)
 		ReleaseSession(&_session);
 
 	return nullptr;
@@ -215,7 +214,7 @@ void LanClient::DisconnectSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 소켓에 현재 요청되어있는 모든 IO 를 중단
 	//--------------------------------------------------------------------
-	if (InterlockedExchange((LONG*)&session->disconnectFlag, TRUE) == FALSE)
+	if (InterlockedExchange8(&session->disconnectFlag, TRUE) == FALSE)
 		CancelIoEx((HANDLE)session->socket, NULL);
 }
 void LanClient::CloseSession(SESSION* session)
@@ -223,7 +222,7 @@ void LanClient::CloseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 참조 세션 반환
 	//--------------------------------------------------------------------
-	if (InterlockedDecrement(&session->ioCount) == 0)
+	if (InterlockedDecrement16(&session->ioCount) == 0)
 		ReleaseSession(session);
 }
 void LanClient::RecvPost(SESSION* session)
@@ -249,7 +248,7 @@ void LanClient::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(session->recvOverlapped, sizeof(OVERLAPPED));
+	ZeroMemory(&session->recvOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaRecvBuf[2];
 	wsaRecvBuf[0].buf = session->recvQ.GetRearBufferPtr();
 	wsaRecvBuf[0].len = directSize;
@@ -259,9 +258,9 @@ void LanClient::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
 	DWORD flag = 0;
-	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, session->recvOverlapped, NULL);
+	int ret = WSARecv(session->socket, wsaRecvBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -278,7 +277,7 @@ void LanClient::RecvPost(SESSION* session)
 			}
 
 			// ioCount가 0이라면 연결 끊기
-			if (InterlockedDecrement(&session->ioCount) == 0)
+			if (InterlockedDecrement16(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
 		}
@@ -287,7 +286,7 @@ void LanClient::RecvPost(SESSION* session)
 		// WSARecv 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, session->recvOverlapped);
+			CancelIoEx((HANDLE)session->socket, &session->recvOverlapped);
 	}
 }
 void LanClient::SendPost(SESSION* session)
@@ -303,7 +302,7 @@ void LanClient::SendPost(SESSION* session)
 		//--------------------------------------------------------------------
 		// 이미 전송 중인 Send 건이 있으면 return
 		//--------------------------------------------------------------------
-		if (InterlockedExchange((LONG*)&session->sendFlag, TRUE) == TRUE)
+		if (InterlockedExchange8(&session->sendFlag, TRUE) == TRUE)
 			return;
 
 		if (session->sendQ.size() > 0)
@@ -312,7 +311,7 @@ void LanClient::SendPost(SESSION* session)
 		//--------------------------------------------------------------------
 		// 전송할 데이터가 있는지 재차 확인 후 없으면 return
 		//--------------------------------------------------------------------
-		InterlockedExchange((LONG*)&session->sendFlag, FALSE);
+		InterlockedExchange8(&session->sendFlag, FALSE);
 		if (session->sendQ.size() <= 0)
 			return;
 	}
@@ -320,7 +319,7 @@ void LanClient::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 를 위한 매개변수 초기화
 	//--------------------------------------------------------------------
-	ZeroMemory(session->sendOverlapped, sizeof(OVERLAPPED));
+	ZeroMemory(&session->sendOverlapped, sizeof(OVERLAPPED));
 	WSABUF wsaBuf[MAX_SENDBUF];
 
 	//--------------------------------------------------------------------
@@ -342,8 +341,8 @@ void LanClient::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
-	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, session->sendOverlapped, NULL);
+	InterlockedIncrement16(&session->ioCount);
+	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, &session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
@@ -360,7 +359,7 @@ void LanClient::SendPost(SESSION* session)
 			}
 
 			// ioCount가 0이라면 연결 끊기
-			if (InterlockedDecrement(&session->ioCount) == 0)
+			if (InterlockedDecrement16(&session->ioCount) == 0)
 				ReleaseSession(session);
 			return;
 		}
@@ -369,7 +368,7 @@ void LanClient::SendPost(SESSION* session)
 		// WSASend 작업 중단 여부 판단
 		//--------------------------------------------------------------------
 		if (session->disconnectFlag == TRUE)
-			CancelIoEx((HANDLE)session->socket, session->sendOverlapped);
+			CancelIoEx((HANDLE)session->socket, &session->sendOverlapped);
 	}
 }
 void LanClient::RecvRoutine(SESSION* session, DWORD cbTransferred)
@@ -381,7 +380,7 @@ void LanClient::RecvRoutine(SESSION* session, DWORD cbTransferred)
 void LanClient::SendRoutine(SESSION* session, DWORD cbTransferred)
 {
 	CompleteSendPacket(session);
-	InterlockedExchange((LONG*)&session->sendFlag, FALSE);
+	InterlockedExchange8(&session->sendFlag, FALSE);
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
@@ -506,7 +505,7 @@ void LanClient::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	// 송신 요청
 	//--------------------------------------------------------------------
-	InterlockedIncrement(&session->ioCount);
+	InterlockedIncrement16(&session->ioCount);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
 void LanClient::ClearSendPacket(SESSION* session)
@@ -589,19 +588,19 @@ unsigned int LanClient::WorkerThread()
 
 		if (cbTransferred != 0)
 		{
-			if (session->recvOverlapped == overlapped)
+			if (&session->recvOverlapped == overlapped)
 			{
 				// Recv 완료 통지 처리
 				RecvRoutine(session, cbTransferred);
 			}
-			else if (session->sendOverlapped == overlapped)
+			else if (&session->sendOverlapped == overlapped)
 			{
 				// Send 완료 통지 처리
 				SendRoutine(session, cbTransferred);
 			}
 		}
 
-		if (InterlockedDecrement(&session->ioCount) == 0)
+		if (InterlockedDecrement16(&session->ioCount) == 0)
 			ReleaseSession(session);
 	}
 	return 0;

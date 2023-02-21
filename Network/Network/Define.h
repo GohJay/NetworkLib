@@ -32,21 +32,20 @@ struct alignas(64) SESSION
 {
 	union {
 		struct {
-			BOOL releaseFlag;
-			LONG ioCount;
+			SHORT releaseFlag;
+			SHORT ioCount;
 		};
-		LONGLONG release;
+		LONG release;
 	};
-	OVERLAPPED* recvOverlapped;
-	OVERLAPPED* sendOverlapped;
-	DWORD64 sessionID;
+	OVERLAPPED recvOverlapped;
+	OVERLAPPED sendOverlapped;
+	SOCKADDR_IN socketAddr;
 	SOCKET socket;
-	WCHAR ip[16];
-	USHORT port;
+	DWORD64 sessionID;
 	DWORD lastRecvTime;
-	BOOL disconnectFlag;
-	BOOL sendFlag;
-	LONG sendBufCount;
+	CHAR disconnectFlag;
+	CHAR sendFlag;
+	SHORT sendBufCount;
 	Jay::NetPacket** sendBuf;
 	Jay::RingBuffer recvQ;
 	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
@@ -54,13 +53,9 @@ struct alignas(64) SESSION
 
 	SESSION() {
 		release = TRUE;
-		recvOverlapped = (OVERLAPPED*)malloc(sizeof(OVERLAPPED));
-		sendOverlapped = (OVERLAPPED*)malloc(sizeof(OVERLAPPED));
 		sendBuf = (Jay::NetPacket**)malloc(sizeof(void*) * MAX_SENDBUF);
 	}
 	~SESSION() {
-		free(recvOverlapped);
-		free(sendOverlapped);
 		free(sendBuf);
 	}
 };
