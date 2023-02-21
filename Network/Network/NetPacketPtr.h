@@ -11,9 +11,9 @@ namespace Jay
 		* @file		NetPacketPtr.h
 		* @brief	Network PacketPtr Class (SmartPointer)
 		* @details	네트워크 송수신을 위한 직렬화버퍼의 스마트포인터 클래스
-		* @author   고재현
+		* @author	고재현
 		* @date		2022-12-03
-		* @version  1.0.0
+		* @version	1.0.0
 		**/
 	public:
 		NetPacketPtr();

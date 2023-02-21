@@ -10,9 +10,9 @@ namespace Jay
 	* @file		NetClient.h
 	* @brief	Network NetClient Class
 	* @details	외부 네트워크의 서버와 통신을 목적으로한 IOCP 클라이언트 클래스
-	* @author   고재현
+	* @author	고재현
 	* @date		2023-01-24
-	* @version  1.0.0
+	* @version	1.0.0
 	**/
 	class NetClient
 	{

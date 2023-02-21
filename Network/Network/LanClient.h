@@ -9,10 +9,10 @@ namespace Jay
 	/**
 	* @file		LanClient.h
 	* @brief	Network LanClient Class
-	* @details	³»ºÎ ³×Æ®¿öÅ©ÀÇ ¼­¹ö¿Í Åë½ÅÀ» ¸ñÀûÀ¸·ÎÇÑ IOCP Å¬¶óÀÌ¾ðÆ® Å¬·¡½º
-	* @author   °íÀçÇö
+	* @details	ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ IOCP Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® Å¬ï¿½ï¿½ï¿½ï¿½
+	* @author	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	* @date		2023-01-24
-	* @version  1.0.0
+	* @version	1.0.0
 	**/
 	class LanClient
 	{

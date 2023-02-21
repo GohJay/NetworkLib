@@ -15,9 +15,9 @@ namespace Jay
 		* @file		NetServerEx.h
 		* @brief	Network NetServer Extension Class
 		* @details	외부 네트워크의 게임 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-02-20
-		* @version  1.0.0
+		* @version	1.0.0
 		**/
 	private:
 		enum CONTENT_JOB_TYPE

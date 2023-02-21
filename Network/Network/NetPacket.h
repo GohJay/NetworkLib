@@ -17,9 +17,9 @@ namespace Jay
 		* @file		NetPacket.h
 		* @brief	Network Packet Class (SerializationBuffer)
 		* @details	네트워크 송수신을 위한 직렬화버퍼 클래스
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-22
-		* @version  1.0.8
+		* @version	1.0.8
 		**/
 	private:
 		NetPacket(int bufferSize = 1024);

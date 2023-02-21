@@ -15,9 +15,9 @@ namespace Jay
 		* @file		Logger.h
 		* @brief	File Logger Class
 		* @details	파일 로그 출력용 클래스
-		* @author   고재현
+		* @author	고재현
 		* @date		2022-02-11
-		* @version  1.0.3
+		* @version	1.0.3
 		**/
 	private:
 		Logger();

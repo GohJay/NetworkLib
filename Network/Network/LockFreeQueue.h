@@ -8,9 +8,9 @@ namespace Jay
     * @file		LockFreeQueue.h
     * @brief	Lock-Free Queue Template Class
     * @details	CAS 연산으로 구현한 구현한 락프리 큐 클래스
-    * @author   고재현
+    * @author	고재현
     * @date		2023-01-08
-    * @version  1.0.0
+    * @version	1.0.0
     **/
     template<typename T>
     class LockFreeQueue

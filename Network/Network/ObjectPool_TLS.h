@@ -14,9 +14,9 @@ namespace Jay
 				T *pData = MemPool.Alloc();
 				pData 사용
 				MemPool.Free(pData);
-	* @author   고재현
+	* @author	고재현
 	* @date		2022-12-31
-	* @version  1.0.0
+	* @version	1.0.0
 	**/
 	template <typename T>
 	class ObjectPool_TLS

@@ -13,9 +13,9 @@ namespace Jay
 		* @file		LanServer.h
 		* @brief	Network LanServer Class
 		* @details	내부 네트워크의 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-22
-		* @version  1.0.3
+		* @version	1.0.3
 		**/
 	public:
 		LanServer();

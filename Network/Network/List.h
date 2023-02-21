@@ -8,9 +8,9 @@ namespace Jay
 	* @file		List.h
 	* @brief	Doubly linked List Template Class
 	* @details	Iterator 패턴으로 구현한 이중연결 리스트 클래스
-	* @author   고재현
+	* @author	고재현
 	* @date		2023-01-08
-	* @version  1.0.1
+	* @version	1.0.1
 	**/
 	template<typename T>
 	class List

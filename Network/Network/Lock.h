@@ -9,7 +9,7 @@ namespace Jay
 		/**
 		* @file		Lock.h
 		* @brief	SRWLOCK Wrapping Class
-		* @details  Slim Reader-Writer Lock Class
+		* @details	Slim Reader-Writer Lock Class
 		* @author	고재현
 		* @date		2023-01-27
 		* @version	1.0.3
@@ -55,7 +55,7 @@ namespace Jay
 		* @file		Lock.h
 		* @brief	AddressLock Class
 		* @details	WaitOnAddress Lock Class
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-27
 		* @version	1.0.3
 		**/
@@ -76,7 +76,7 @@ namespace Jay
 		* @file		Lock.h
 		* @brief	SpinLock Class
 		* @details	Busy-wait Lock Class
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-27
 		* @version	1.0.3
 		**/
@@ -98,7 +98,7 @@ namespace Jay
 		* @file		Lock.h
 		* @brief	Lock 객체에 대한 Guard Class
 		* @details	Lock 객체 사용으로 발생할 수 있는 Dead-lock을 방지하기 위한 Guard Class (Exclusive lock)
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-27
 		* @version	1.0.2
 		**/
@@ -122,7 +122,7 @@ namespace Jay
 		* @file		Lock.h
 		* @brief	Lock 객체에 대한 Guard Class
 		* @details	Lock 객체 사용으로 발생할 수 있는 Dead-lock을 방지하기 위한 Guard Class (Shared lock)
-		* @author   고재현
+		* @author	고재현
 		* @date		2023-01-27
 		* @version	1.0.0
 		**/
