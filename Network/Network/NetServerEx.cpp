@@ -792,7 +792,7 @@ bool NetServerEx::ContentJobProc()
 	NetContent* content = contentInfo->content;
 
 	CONTENT_JOB* contentJob;
-	while (contentInfo->jobQ.size())
+	while (contentInfo->jobQ.size() > 0)
 	{
 		contentInfo->jobQ.Dequeue(contentJob);
 
