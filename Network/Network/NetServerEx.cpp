@@ -63,6 +63,7 @@ bool NetServerEx::Start(const wchar_t* ipaddress, int port, int workerCreateCnt,
 	_timeoutSec = timeoutSec;
 	_packetCode = packetCode;
 	_packetKey = packetKey;
+	_stopSignal = false;
 	ZeroMemory(&_monitoring, sizeof(MONITORING));
 
 	//--------------------------------------------------------------------
@@ -95,10 +96,10 @@ bool NetServerEx::Start(const wchar_t* ipaddress, int port, int workerCreateCnt,
 void NetServerEx::Stop()
 {
 	//--------------------------------------------------------------------
-	// AcceptThread, ManagementThread 종료 신호 보내기
+	// AcceptThread, ManagementThread, ContentThread 종료 신호 보내기
 	//--------------------------------------------------------------------
 	closesocket(_listenSocket);
-	SetEvent(_hExitThreadEvent);
+	_stopSignal = true;
 
 	//--------------------------------------------------------------------
 	// AcceptThread, ManagementThread 종료 대기
@@ -987,14 +988,6 @@ bool NetServerEx::Initial()
 		return false;
 	}
 
-	_hExitThreadEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (_hExitThreadEvent == NULL)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
-		CloseHandle(_hCompletionPort);
-		return false;
-	}
-
 	_hContentThread = new HANDLE[_contentCnt];
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
 	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
@@ -1029,7 +1022,6 @@ void NetServerEx::Release()
 	}
 
 	CloseHandle(_hCompletionPort);
-	CloseHandle(_hExitThreadEvent);
 	CloseHandle(_hManagementThread);
 	CloseHandle(_hAcceptThread);
 	for (int i = 0; i < _workerCreateCnt; i++)
@@ -1162,53 +1154,39 @@ unsigned int NetServerEx::WorkerThread()
 }
 unsigned int NetServerEx::ManagementThread()
 {
-	for (;;)
+	while (!_stopSignal)
 	{
-		DWORD ret = WaitForSingleObject(_hExitThreadEvent, 1000);
-		switch (ret)
-		{
-		case WAIT_OBJECT_0:
-			return 0;
-		case WAIT_TIMEOUT:
-			UpdateTPS();
-			TimeoutProc();
-			break;
-		default:
-			break;
-		}
+		// TPS 갱신
+		UpdateTPS();
+
+		// 타임아웃 처리
+		TimeoutProc();
+
+		// 1000ms 딜레이
+		Sleep(1000);
 	}
 	return 0;
 }
 unsigned int NetServerEx::ContentThread()
 {
 	CONTENT_INFO* contentInfo = GetCurrentContentInfo();
-	DWORD frameInterval = contentInfo->frameInterval;
-	DWORD timeout = frameInterval;
+	DWORD frameInterval;
 	DWORD deltatime;
 	DWORD aftertime;
 	DWORD beforetime = timeGetTime();
-	
-	for (;;)
-	{
-		DWORD ret = WaitForSingleObject(_hExitThreadEvent, timeout);
-		switch (ret)
-		{
-		case WAIT_OBJECT_0:
-			return 0;
-		case WAIT_TIMEOUT:
-			// 컨텐츠 갱신
-			NotifyContent();
 
-			// 프레임 계산
-			aftertime = timeGetTime();
-			deltatime = aftertime - beforetime;
-			frameInterval = contentInfo->frameInterval;
-			timeout = (deltatime < frameInterval) ? frameInterval - deltatime : 0;
-			beforetime += frameInterval;
-			break;
-		default:
-			break;
-		}
+	while (!_stopSignal)
+	{
+		// 컨텐츠 갱신
+		NotifyContent();
+
+		// 프레임 계산
+		aftertime = timeGetTime();
+		deltatime = aftertime - beforetime;
+		frameInterval = contentInfo->frameInterval;
+		if (deltatime < frameInterval)
+			Sleep(frameInterval - deltatime);
+		beforetime += frameInterval;
 	}
 	return 0;
 }

@@ -110,7 +110,6 @@ namespace Jay
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
-		HANDLE _hExitThreadEvent;
 		HANDLE* _hContentThread;
 		CONTENT_INFO _contentArray[MAX_CONTENT];
 		WORD _defaultContentIndex;
@@ -121,6 +120,7 @@ namespace Jay
 		MONITORING _monitoring;
 		BYTE _packetCode;
 		BYTE _packetKey;
+		volatile bool _stopSignal;
 		ObjectPool_TLS<SESSION_JOB> _sessionJobPool;
 		ObjectPool_TLS<CONTENT_JOB> _contentJobPool;
 	};

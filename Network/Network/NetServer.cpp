@@ -34,6 +34,7 @@ bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 	_timeoutSec = timeoutSec;
 	_packetCode = packetCode;
 	_packetKey = packetKey;
+	_stopSignal = false;
 	ZeroMemory(&_monitoring, sizeof(MONITORING));
 
 	//--------------------------------------------------------------------
@@ -67,7 +68,7 @@ void NetServer::Stop()
 	// AcceptThread, ManagementThread 종료 신호 보내기
 	//--------------------------------------------------------------------
 	closesocket(_listenSocket);
-	SetEvent(_hExitThreadEvent);
+	_stopSignal = true;
 
 	//--------------------------------------------------------------------
 	// AcceptThread, ManagementThread 종료 대기
@@ -748,14 +749,6 @@ bool NetServer::Initial()
 		return false;
 	}
 
-	_hExitThreadEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (_hExitThreadEvent == NULL)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
-		CloseHandle(_hCompletionPort);
-		return false;
-	}
-
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
 	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
@@ -778,7 +771,6 @@ void NetServer::Release()
 		_sessionArray[index].~SESSION();
 
 	CloseHandle(_hCompletionPort);
-	CloseHandle(_hExitThreadEvent);
 	CloseHandle(_hManagementThread);
 	CloseHandle(_hAcceptThread);
 	for (int i = 0; i < _workerCreateCnt; i++)
@@ -902,20 +894,16 @@ unsigned int NetServer::WorkerThread()
 }
 unsigned int NetServer::ManagementThread()
 {
-	for (;;)
+	while (!_stopSignal)
 	{
-		DWORD ret = WaitForSingleObject(_hExitThreadEvent, 1000);
-		switch (ret)
-		{
-		case WAIT_OBJECT_0:
-			return 0;
-		case WAIT_TIMEOUT:
-			UpdateTPS();
-			TimeoutProc();
-			break;
-		default:
-			break;
-		}
+		// TPS 갱신
+		UpdateTPS();
+
+		// 타임아웃 처리
+		TimeoutProc();
+
+		// 1000ms 딜레이
+		Sleep(1000);
 	}
 	return 0;
 }

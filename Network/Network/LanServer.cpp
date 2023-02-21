@@ -32,6 +32,7 @@ bool LanServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 	_workerRunningCnt = workerRunningCnt;
 	_sessionMax = sessionMax;
 	_timeoutSec = timeoutSec;
+	_stopSignal = false;
 	ZeroMemory(&_monitoring, sizeof(MONITORING));
 
 	//--------------------------------------------------------------------
@@ -65,7 +66,7 @@ void LanServer::Stop()
 	// AcceptThread, ManagementThread 종료 신호 보내기
 	//--------------------------------------------------------------------
 	closesocket(_listenSocket);
-	SetEvent(_hExitThreadEvent);
+	_stopSignal = true;
 
 	//--------------------------------------------------------------------
 	// AcceptThread, ManagementThread 종료 대기
@@ -736,14 +737,6 @@ bool LanServer::Initial()
 		return false;
 	}
 
-	_hExitThreadEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (_hExitThreadEvent == NULL)
-	{
-		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
-		CloseHandle(_hCompletionPort);
-		return false;
-	}
-
 	_hWorkerThread = new HANDLE[_workerCreateCnt];
 	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
@@ -766,7 +759,6 @@ void LanServer::Release()
 		_sessionArray[index].~SESSION();
 
 	CloseHandle(_hCompletionPort);
-	CloseHandle(_hExitThreadEvent);
 	CloseHandle(_hManagementThread);
 	CloseHandle(_hAcceptThread);
 	for (int i = 0; i < _workerCreateCnt; i++)
@@ -890,20 +882,16 @@ unsigned int LanServer::WorkerThread()
 }
 unsigned int LanServer::ManagementThread()
 {
-	for (;;)
+	while (!_stopSignal)
 	{
-		DWORD ret = WaitForSingleObject(_hExitThreadEvent, 1000);
-		switch (ret)
-		{
-		case WAIT_OBJECT_0:
-			return 0;
-		case WAIT_TIMEOUT:
-			UpdateTPS();
-			TimeoutProc();
-			break;
-		default:
-			break;
-		}
+		// TPS 갱신
+		UpdateTPS();
+
+		// 타임아웃 처리
+		TimeoutProc();
+
+		// 1000ms 딜레이
+		Sleep(1000);
 	}
 	return 0;
 }

@@ -78,10 +78,10 @@ namespace Jay
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
-		HANDLE _hExitThreadEvent;
 		DWORD _lastTimeoutProc;
 		int _timeoutSec;
 		MONITORING _monitoring;
+		volatile bool _stopSignal;
 	};
 }
 
