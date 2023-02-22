@@ -161,6 +161,9 @@ __int64 NetServer::GetTotalAcceptCount()
 }
 SESSION* NetServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 {
+	//--------------------------------------------------------------------
+	// 세션 인덱스 배정
+	//--------------------------------------------------------------------
 	WORD index;
 	if (!_indexStack.Pop(index))
 	{
@@ -169,9 +172,11 @@ SESSION* NetServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 		return nullptr;
 	}
 
+	//--------------------------------------------------------------------
+	// 세션 할당
+	//--------------------------------------------------------------------
 	SESSION* session = &_sessionArray[index];
-	InterlockedIncrement16(&session->ioCount);
-
+	IncrementIOCount(session);
 	memmove(&session->socketAddr, socketAddr, sizeof(SOCKADDR_IN));
 	session->socket = socket;
 	session->lastRecvTime = timeGetTime();
@@ -200,10 +205,13 @@ void NetServer::ReleaseSession(SESSION* session)
 	closesocket(session->socket);
 
 	//--------------------------------------------------------------------
-	// 컨텐츠 부에 알림 요청
+	// 컨텐츠 부에 알림
 	//--------------------------------------------------------------------
-	QueueUserMessage(UM_ALERT_CLIENT_LEAVE, (LPVOID)session->sessionID);
+	OnClientLeave(session->sessionID);
 
+	//--------------------------------------------------------------------
+	// 세션 인덱스 반환
+	//--------------------------------------------------------------------
 	WORD index = GET_SESSION_INDEX(session->sessionID);
 	_indexStack.Push(index);
 
@@ -221,8 +229,7 @@ SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
 {
 	WORD index = GET_SESSION_INDEX(sessionID);
 	SESSION* session = &_sessionArray[index];
-
-	InterlockedIncrement16(&session->ioCount);
+	IncrementIOCount(session);
 
 	do
 	{
@@ -244,18 +251,23 @@ SESSION* NetServer::DuplicateSession(DWORD64 sessionID)
 		return session;
 	} while (0);
 
-	if (InterlockedDecrement16(&session->ioCount) == 0)
-		ReleaseSession(session);
-
+	CloseSession(session);
 	return nullptr;
+}
+void NetServer::IncrementIOCount(SESSION* session)
+{
+	//--------------------------------------------------------------------
+	// IO Count 증감
+	//--------------------------------------------------------------------
+	InterlockedIncrement16(&session->ioCount);
 }
 void NetServer::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
-	// 참조 세션 반환
+	// IO Count 차감 값이 0일 경우 세션 릴리즈 요청
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
-		ReleaseSession(session);
+		QueueUserMessage(UM_POST_SESSION_RELEASE, session);
 }
 void NetServer::RecvPost(SESSION* session)
 {
@@ -291,7 +303,8 @@ void NetServer::RecvPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSARecv 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement16(&session->ioCount);
+	IncrementIOCount(session);
+
 	DWORD flag = 0;
 	int ret = WSARecv(session->socket, wsaBuf, 2, NULL, &flag, &session->recvOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
@@ -309,9 +322,7 @@ void NetServer::RecvPost(SESSION* session)
 				break;
 			}
 
-			// ioCount가 0이라면 연결 끊기
-			if (InterlockedDecrement16(&session->ioCount) == 0)
-				ReleaseSession(session);
+			CloseSession(session);
 			return;
 		}
 
@@ -374,7 +385,8 @@ void NetServer::SendPost(SESSION* session)
 	//--------------------------------------------------------------------
 	// WSASend 처리
 	//--------------------------------------------------------------------
-	InterlockedIncrement16(&session->ioCount);
+	IncrementIOCount(session);
+
 	int ret = WSASend(session->socket, wsaBuf, count, NULL, 0, &session->sendOverlapped, NULL);
 	if (ret == SOCKET_ERROR)
 	{
@@ -391,9 +403,7 @@ void NetServer::SendPost(SESSION* session)
 				break;
 			}
 
-			// ioCount가 0이라면 세션 정리
-			if (InterlockedDecrement16(&session->ioCount) == 0)
-				ReleaseSession(session);
+			CloseSession(session);
 			return;
 		}
 
@@ -408,7 +418,17 @@ void NetServer::RecvRoutine(SESSION* session, DWORD cbTransferred)
 {
 	session->lastRecvTime = timeGetTime();
 	session->recvQ.MoveRear(cbTransferred);
-	CompleteRecvPacket(session);
+	for (;;)
+	{
+		int ret = CompleteRecvPacket(session);
+		if (ret == 1)
+			break;
+		else if (ret == -1)
+		{
+			DisconnectSession(session);
+			break;
+		}
+	}
 	RecvPost(session);
 }
 void NetServer::SendRoutine(SESSION* session, DWORD cbTransferred)
@@ -418,96 +438,87 @@ void NetServer::SendRoutine(SESSION* session, DWORD cbTransferred)
 	if (session->sendQ.size() > 0)
 		SendPost(session);
 }
-void NetServer::CompleteRecvPacket(SESSION* session)
+int NetServer::CompleteRecvPacket(SESSION* session)
 {
+	//--------------------------------------------------------------------
+	// 수신용 링버퍼의 사이즈가 Header 크기보다 큰지 확인
+	//--------------------------------------------------------------------
 	NET_PACKET_HEADER header;
-	for (;;)
+	int size = session->recvQ.GetUseSize();
+	if (size <= sizeof(header))
+		return 1;
+
+	//--------------------------------------------------------------------
+	// 수신용 링버퍼에서 Header 를 Peek 하여 확인
+	//--------------------------------------------------------------------
+	int ret = session->recvQ.Peek((char*)&header, sizeof(header));
+	if (ret != sizeof(header))
+	{
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, sizeof(header), ret);
+		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+		return -1;
+	}
+
+	//--------------------------------------------------------------------
+	// Payload 크기가 설정해둔 최대 크기를 초과하는지 확인
+	//--------------------------------------------------------------------
+	if (header.len > MAX_PAYLOAD)
+		return -1;
+
+	//--------------------------------------------------------------------
+	// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
+	//--------------------------------------------------------------------
+	if (session->recvQ.GetUseSize() < sizeof(header) + header.len)
+		return 1;
+
+	session->recvQ.MoveFront(sizeof(header));
+
+	//--------------------------------------------------------------------
+	// 직렬화 버퍼에 Header 담기
+	//--------------------------------------------------------------------
+	NetPacket* packet = NetPacket::Alloc();
+	packet->PutHeader((char*)&header, sizeof(header));
+
+	//--------------------------------------------------------------------
+	// 직렬화 버퍼에 Payload 담기
+	//--------------------------------------------------------------------
+	ret = session->recvQ.Dequeue(packet->GetRearBufferPtr(), header.len);
+	if (ret != header.len)
+	{
+		Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, header.len, ret);
+		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);		
+		NetPacket::Free(packet);
+		return -1;
+	}
+	packet->MoveRear(ret);
+
+	//--------------------------------------------------------------------
+	// 직렬화 버퍼 디코딩 처리
+	//--------------------------------------------------------------------
+	if (!packet->Decode(_packetCode, _packetKey))
+	{
+		OnError(NET_ERROR_DECODE_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+		NetPacket::Free(packet);
+		return -1;
+	}
+
+	try
 	{
 		//--------------------------------------------------------------------
-		// 수신용 링버퍼의 사이즈가 Header 크기보다 큰지 확인
+		// 컨텐츠 부에 직렬화 버퍼 전달
 		//--------------------------------------------------------------------
-		int size = session->recvQ.GetUseSize();
-		if (size <= sizeof(header))
-			break;
-
-		//--------------------------------------------------------------------
-		// 수신용 링버퍼에서 Header 를 Peek 하여 확인
-		//--------------------------------------------------------------------
-		int ret = session->recvQ.Peek((char*)&header, sizeof(header));
-		if (ret != sizeof(header))
-		{
-			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, peek size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, sizeof(header), ret);
-			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
-			DisconnectSession(session);
-			break;
-		}
-
-		//--------------------------------------------------------------------
-		// Payload 크기가 설정해둔 최대 크기를 초과하는지 확인
-		//--------------------------------------------------------------------
-		if (header.len > MAX_PAYLOAD)
-		{
-			DisconnectSession(session);
-			break;
-		}
-		
-		//--------------------------------------------------------------------
-		// 수신용 링버퍼의 사이즈가 Header + Payload 크기 만큼 있는지 확인
-		//--------------------------------------------------------------------
-		if (session->recvQ.GetUseSize() < sizeof(header) + header.len)
-			break;
-
-		session->recvQ.MoveFront(sizeof(header));
-
-		//--------------------------------------------------------------------
-		// 직렬화 버퍼에 Header 담기
-		//--------------------------------------------------------------------
-		NetPacket* packet = NetPacket::Alloc();
-		packet->PutHeader((char*)&header, sizeof(header));
-
-		//--------------------------------------------------------------------
-		// 직렬화 버퍼에 Payload 담기
-		//--------------------------------------------------------------------
-		ret = session->recvQ.Dequeue(packet->GetRearBufferPtr(), header.len);
-		if (ret != header.len)
-		{
-			Logger::WriteLog(L"Net", LOG_LEVEL_ERROR, L"%s() line: %d - error: %d, dequeue size: %d, ret size: %d", __FUNCTIONW__, __LINE__, NET_FATAL_INVALID_SIZE, header.len, ret);
-			OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
-			DisconnectSession(session);
-			NetPacket::Free(packet);
-			break;
-		}
-		packet->MoveRear(ret);
-		
-		//--------------------------------------------------------------------
-		// 직렬화 버퍼 디코딩 처리
-		//--------------------------------------------------------------------
-		if (!packet->Decode(_packetCode, _packetKey))
-		{
-			OnError(NET_ERROR_DECODE_FAILED, __FUNCTIONW__, __LINE__, session->sessionID, NULL);
-			DisconnectSession(session);
-			NetPacket::Free(packet);
-			break;
-		}
-
-		try
-		{
-			//--------------------------------------------------------------------
-			// 컨텐츠 부에 직렬화 버퍼 전달
-			//--------------------------------------------------------------------
-			OnRecv(session->sessionID, packet);
-		}
-		catch (NetException& ex)
-		{
-			OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
-			DisconnectSession(session);
-			NetPacket::Free(packet);
-			break;
-		}
-
-		NetPacket::Free(packet);
-		InterlockedIncrement(&_monitoring.curTPS.recv);
+		OnRecv(session->sessionID, packet);
 	}
+	catch (NetException& ex)
+	{
+		OnError(ex.GetLastError(), __FUNCTIONW__, __LINE__, session->sessionID, NULL);
+		NetPacket::Free(packet);
+		return -1;
+	}
+
+	NetPacket::Free(packet);
+	InterlockedIncrement(&_monitoring.curTPS.recv);
+	return 0;
 }
 void NetServer::CompleteSendPacket(SESSION* session)
 {
@@ -515,8 +526,7 @@ void NetServer::CompleteSendPacket(SESSION* session)
 	// 전송 완료한 직렬화 버퍼 정리
 	//--------------------------------------------------------------------
 	NetPacket* packet;
-	int count;
-	for (count = 0; count < session->sendBufCount; count++)
+	for (int count = 0; count < session->sendBufCount; count++)
 	{
 		packet = session->sendBuf[count];
 		NetPacket::Free(packet);
@@ -550,14 +560,13 @@ void NetServer::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	// 송신 요청
 	//--------------------------------------------------------------------
-	InterlockedIncrement16(&session->ioCount);
+	IncrementIOCount(session);
 	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
 void NetServer::ClearSendPacket(SESSION* session)
 {
 	NetPacket* packet;
-	int count;
-	for (count = 0; count < session->sendBufCount; count++)
+	for (int count = 0; count < session->sendBufCount; count++)
 	{
 		//--------------------------------------------------------------------
 		// 전송 대기중이던 직렬화 버퍼 정리
@@ -597,10 +606,10 @@ void NetServer::UserMessageProc(DWORD message, LPVOID lpParam)
 			CloseSession(session);
 		}
 		break;
-	case UM_ALERT_CLIENT_LEAVE:
+	case UM_POST_SESSION_RELEASE:
 		{
-			DWORD64 sessionID = (DWORD64)lpParam;
-			OnClientLeave(sessionID);
+			SESSION* session = (SESSION*)lpParam;
+			ReleaseSession(session);
 		}
 		break;
 	default:
@@ -641,7 +650,7 @@ void NetServer::TimeoutProc()
 		if (session->lastRecvTime > timeout)
 			continue;
 
-		InterlockedIncrement16(&session->ioCount);
+		IncrementIOCount(session);
 
 		do
 		{
@@ -663,8 +672,7 @@ void NetServer::TimeoutProc()
 			DisconnectSession(session);
 		} while (0);
 
-		if (InterlockedDecrement16(&session->ioCount) == 0)
-			ReleaseSession(session);
+		CloseSession(session);
 	}
 
 	_lastTimeoutProc = currentTime;
@@ -887,8 +895,7 @@ unsigned int NetServer::WorkerThread()
 			}
 		}
 
-		if (InterlockedDecrement16(&session->ioCount) == 0)
-			ReleaseSession(session);
+		CloseSession(session);
 	}
 	return 0;
 }

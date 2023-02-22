@@ -29,9 +29,9 @@ namespace Jay
 			CONTENT_JOB_TYPE type;
 			DWORD64 sessionID;
 		};
-		struct CONTENT_INFO
+		struct CONTENT
 		{
-			NetContent* content;
+			NetContent* handler;
 			WORD contentID;
 			WORD frameInterval;
 			DWORD threadID;
@@ -42,8 +42,8 @@ namespace Jay
 		NetServerEx();
 		virtual ~NetServerEx();
 	public:
-		void AttachContent(NetContent* content, WORD contentID, WORD frameInterval, bool default = false);
-		bool ChangeFrameInterval(WORD contentID, WORD frameInterval);
+		void AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool default = false);
+		bool SetFrameInterval(WORD contentID, WORD frameInterval);
 		bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
 		void Stop();
 		bool Disconnect(DWORD64 sessionID);
@@ -65,12 +65,13 @@ namespace Jay
 		void ReleaseSession(SESSION* session);
 		void DisconnectSession(SESSION* session);
 		SESSION* DuplicateSession(DWORD64 sessionID);
+		void IncrementIOCount(SESSION* session);
 		void CloseSession(SESSION* session);
 		void RecvPost(SESSION* session);
 		void SendPost(SESSION* session);
 		void RecvRoutine(SESSION* session, DWORD cbTransferred);
 		void SendRoutine(SESSION* session, DWORD cbTransferred);
-		void CompleteRecvPacket(SESSION* session);
+		int CompleteRecvPacket(SESSION* session);
 		void CompleteSendPacket(SESSION* session);
 		void TrySendPacket(SESSION* session, NetPacket* packet);
 		void ClearSendPacket(SESSION* session);
@@ -80,11 +81,11 @@ namespace Jay
 		void TimeoutProc();
 		void UpdateTPS();
 		void TryMoveContent(SESSION* session, WORD contentID);
-		CONTENT_INFO* FindContentInfo(WORD contentID);
-		CONTENT_INFO* GetCurrentContentInfo();
-		bool ContentJobProc();
-		bool SessionJobProc(SESSION* session, NetContent* content);
-		void NotifyContent();
+		CONTENT* FindContentInfo(WORD contentID);
+		CONTENT* GetCurrentContentInfo();
+		bool SessionJobProc(SESSION* session, NetContent* handler);
+		bool ContentJobProc(CONTENT* content);
+		void NotifyContent(CONTENT* content);
 	private:
 		bool Listen(const wchar_t* ipaddress, int port, bool nagle);
 		bool Initial();
@@ -111,7 +112,7 @@ namespace Jay
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
 		HANDLE* _hContentThread;
-		CONTENT_INFO _contentArray[MAX_CONTENT];
+		CONTENT _contentArray[MAX_CONTENT];
 		WORD _defaultContentIndex;
 		WORD _contentCnt;
 		DWORD _tlsContent;

@@ -42,12 +42,13 @@ namespace Jay
 		void ReleaseSession(SESSION* session);
 		void DisconnectSession(SESSION* session);
 		SESSION* DuplicateSession(DWORD64 sessionID);
+		void IncrementIOCount(SESSION* session);
 		void CloseSession(SESSION* session);
 		void RecvPost(SESSION* session);
 		void SendPost(SESSION* session);
 		void RecvRoutine(SESSION* session, DWORD cbTransferred);
 		void SendRoutine(SESSION* session, DWORD cbTransferred);
-		void CompleteRecvPacket(SESSION* session);
+		int CompleteRecvPacket(SESSION* session);
 		void CompleteSendPacket(SESSION* session);
 		void TrySendPacket(SESSION* session, NetPacket* packet);
 		void ClearSendPacket(SESSION* session);

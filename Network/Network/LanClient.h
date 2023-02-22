@@ -31,14 +31,15 @@ namespace Jay
 	private:
 		SESSION* CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr);
 		void ReleaseSession(SESSION* session);
-		SESSION* DuplicateSession();
 		void DisconnectSession(SESSION* session);
+		SESSION* DuplicateSession();
+		void IncrementIOCount(SESSION* session);
 		void CloseSession(SESSION* session);
 		void RecvPost(SESSION* session);
 		void SendPost(SESSION* session);
 		void RecvRoutine(SESSION* session, DWORD cbTransferred);
 		void SendRoutine(SESSION* session, DWORD cbTransferred);
-		void CompleteRecvPacket(SESSION* session);
+		int CompleteRecvPacket(SESSION* session);
 		void CompleteSendPacket(SESSION* session);
 		void TrySendPacket(SESSION* session, NetPacket* packet);
 		void ClearSendPacket(SESSION* session);
