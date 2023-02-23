@@ -231,7 +231,7 @@ void NetClient::IncrementIOCount(SESSION* session)
 void NetClient::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
-	// 참조 세션 반환
+	// IO Count 차감 값이 0일 경우 세션 릴리즈 요청
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
 		QueueUserMessage(UM_POST_SESSION_RELEASE, session);

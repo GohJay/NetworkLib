@@ -12,7 +12,7 @@
 
 using namespace Jay;
 
-NetServer::NetServer() : _sessionCnt(0), _sessionKey(0), _lastTimeoutProc(0)
+NetServer::NetServer() : _sessionCount(0), _sessionKey(0), _lastTimeoutProc(0)
 {
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
@@ -26,10 +26,10 @@ NetServer::~NetServer()
 {
 	WSACleanup();
 }
-bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
+bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCount, int workerRunningCount, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec, bool nagle)
 {
-	_workerCreateCnt = workerCreateCnt;
-	_workerRunningCnt = workerRunningCnt;
+	_workerCreateCount = workerCreateCount;
+	_workerRunningCount = workerRunningCount;
 	_sessionMax = sessionMax;
 	_timeoutSec = timeoutSec;
 	_packetCode = packetCode;
@@ -55,7 +55,7 @@ bool NetServer::Start(const wchar_t* ipaddress, int port, int workerCreateCnt, i
 	//--------------------------------------------------------------------
 	// Thread Begin
 	//--------------------------------------------------------------------
-	for (int i = 0; i < _workerCreateCnt; i++)
+	for (int i = 0; i < _workerCreateCount; i++)
 		_hWorkerThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapWorkerThread, this, 0, NULL);
 	_hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, WrapAcceptThread, this, 0, NULL);
 	_hManagementThread = (HANDLE)_beginthreadex(NULL, 0, WrapManagementThread, this, 0, NULL);
@@ -93,7 +93,7 @@ void NetServer::Stop()
 	//--------------------------------------------------------------------
 	// 모든 세션 정리 대기
 	//--------------------------------------------------------------------
-	while (_sessionCnt > 0)
+	while (_sessionCount > 0)
 		Sleep(500);
 
 	//--------------------------------------------------------------------
@@ -104,7 +104,7 @@ void NetServer::Stop()
 	//--------------------------------------------------------------------
 	// WorkerThread 종료 대기
 	//--------------------------------------------------------------------
-	ret = WaitForMultipleObjects(_workerCreateCnt, _hWorkerThread, TRUE, INFINITE);
+	ret = WaitForMultipleObjects(_workerCreateCount, _hWorkerThread, TRUE, INFINITE);
 	if (ret == WAIT_FAILED)
 		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
 
@@ -137,7 +137,7 @@ bool NetServer::SendPacket(DWORD64 sessionID, NetPacket* packet)
 }
 int NetServer::GetSessionCount()
 {
-	return _sessionCnt;
+	return _sessionCount;
 }
 int NetServer::GetUsePacketCount()
 {
@@ -187,7 +187,7 @@ SESSION* NetServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 	session->sessionID = MAKE_SESSIONID(++_sessionKey, index);
 	session->releaseFlag = FALSE;
 
-	InterlockedIncrement16((SHORT*)&_sessionCnt);
+	InterlockedIncrement16((SHORT*)&_sessionCount);
 	return session;
 }
 void NetServer::ReleaseSession(SESSION* session)
@@ -215,7 +215,7 @@ void NetServer::ReleaseSession(SESSION* session)
 	WORD index = GET_SESSION_INDEX(session->sessionID);
 	_indexStack.Push(index);
 
-	InterlockedDecrement16((SHORT*)&_sessionCnt);
+	InterlockedDecrement16((SHORT*)&_sessionCount);
 }
 void NetServer::DisconnectSession(SESSION* session)
 {
@@ -750,14 +750,14 @@ bool NetServer::Initial()
 		return false;
 	}
 
-	_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, _workerRunningCnt);
+	_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, _workerRunningCount);
 	if (_hCompletionPort == NULL)
 	{
 		OnError(NET_ERROR_INITIAL_FAILED, __FUNCTIONW__, __LINE__, NULL, GetLastError());
 		return false;
 	}
 
-	_hWorkerThread = new HANDLE[_workerCreateCnt];
+	_hWorkerThread = new HANDLE[_workerCreateCount];
 	_sessionArray = (SESSION*)_aligned_malloc(sizeof(SESSION) * _sessionMax, 64);
 
 	int index;
@@ -781,7 +781,7 @@ void NetServer::Release()
 	CloseHandle(_hCompletionPort);
 	CloseHandle(_hManagementThread);
 	CloseHandle(_hAcceptThread);
-	for (int i = 0; i < _workerCreateCnt; i++)
+	for (int i = 0; i < _workerCreateCount; i++)
 		CloseHandle(_hWorkerThread[i]);
 
 	_aligned_free(_sessionArray);
@@ -805,7 +805,7 @@ unsigned int NetServer::AcceptThread()
 		//--------------------------------------------------------------------
 		// 동시접속자 수 확인. 최대치를 초과할 경우 연결 종료
 		//--------------------------------------------------------------------
-		if (_sessionCnt >= _sessionMax)
+		if (_sessionCount >= _sessionMax)
 		{
 			closesocket(socket);
 			continue;

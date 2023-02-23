@@ -1,7 +1,7 @@
 #ifndef __NETSERVER__H_
 #define __NETSERVER__H_
 #include "Base.h"
-#include "Define.h"
+#include "Session.h"
 #include "NetPacket.h"
 #include "LockFreeStack.h"
 
@@ -21,7 +21,7 @@ namespace Jay
 		NetServer();
 		virtual ~NetServer();
 	public:
-		bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
+		bool Start(const wchar_t* ipaddress, int port, int workerCreateCount, int workerRunningCount, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
 		void Stop();
 		bool Disconnect(DWORD64 sessionID);
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
@@ -69,13 +69,13 @@ namespace Jay
 	private:
 		SESSION* _sessionArray;
 		WORD _sessionMax;
-		WORD _sessionCnt;
+		WORD _sessionCount;
 		DWORD64 _sessionKey;
 		LockFreeStack<WORD> _indexStack;
 		SOCKET _listenSocket;
 		HANDLE _hCompletionPort;
-		int _workerCreateCnt;
-		int _workerRunningCnt;
+		int _workerCreateCount;
+		int _workerRunningCount;
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;

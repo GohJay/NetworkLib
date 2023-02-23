@@ -137,6 +137,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Base.h" />
+    <ClInclude Include="Content.h" />
     <ClInclude Include="Define.h" />
     <ClInclude Include="Enviroment.h" />
     <ClInclude Include="Error.h" />
@@ -151,6 +152,7 @@
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="NetServerEx.h" />
     <ClInclude Include="ObjectPool_TLS.h" />
+    <ClInclude Include="Session.h" />
     <ClInclude Include="User.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />

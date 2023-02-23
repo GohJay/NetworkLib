@@ -12,7 +12,7 @@ enum CONTENT_ID
 
 enum CONTENT_FRAME_INTERVAL
 {
-	FRAME_INTERVAL_AUTH = 1,
+	FRAME_INTERVAL_AUTH = 10,
 	FRAME_INTERVAL_GAME = 0
 };
 
@@ -23,24 +23,25 @@ public:
 	~EchoServerEx();
 private:
 	bool OnConnectionRequest(const wchar_t* ipaddress, int port) override;
-	void OnClientJoin(DWORD64 sessionID) override;
-	void OnClientLeave(DWORD64 sessionID) override;
 	void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) override;
 };
 
-class LoginServer : public Jay::NetContent
+class LoginServerEx : public Jay::NetContent
 {
 public:
-	LoginServer(EchoServerEx* subject);
-	~LoginServer();
+	LoginServerEx(EchoServerEx* subject);
+	~LoginServerEx();
 public:
 	int GetFPS();
 private:
 	void OnUpdate() override;
-	void OnContentJoin(DWORD64 sessionID) override;
-	void OnContentLeave(DWORD64 sessionID) override;
+	void OnClientJoin(DWORD64 sessionID) override;
+	void OnClientLeave(DWORD64 sessionID) override;
+	void OnContentEnter(DWORD64 sessionID, WPARAM wParam, LPARAM lParam) override;
+	void OnContentExit(DWORD64 sessionID) override;
 	void OnRecv(DWORD64 sessionID, Jay::NetPacket* packet) override;
 private:
+	void LoginProc(DWORD64 sessionID, Jay::NetPacket* packet);
 	void ManagementThread();
 private:
 	EchoServerEx* _subject;
@@ -50,19 +51,22 @@ private:
 	bool _stopSignal;
 };
 
-class GameServer : public Jay::NetContent
+class GameServerEx : public Jay::NetContent
 {
 public:
-	GameServer(EchoServerEx* subject);
-	~GameServer();
+	GameServerEx(EchoServerEx* subject);
+	~GameServerEx();
 public:
 	int GetFPS();
 private:
 	void OnUpdate() override;
-	void OnContentJoin(DWORD64 sessionID) override;
-	void OnContentLeave(DWORD64 sessionID) override;
+	void OnClientJoin(DWORD64 sessionID) override;
+	void OnClientLeave(DWORD64 sessionID) override;
+	void OnContentEnter(DWORD64 sessionID, WPARAM wParam, LPARAM lParam) override;
+	void OnContentExit(DWORD64 sessionID) override;
 	void OnRecv(DWORD64 sessionID, Jay::NetPacket* packet) override;
 private:
+	void PacketProc_Echo(DWORD64 sessionID, Jay::NetPacket* packet);
 	void ManagementThread();
 private:
 	EchoServerEx* _subject;

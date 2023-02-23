@@ -22,7 +22,7 @@ namespace Jay
 		* @version	1.0.8
 		**/
 	private:
-		NetPacket(int bufferSize = 1024);
+		NetPacket(int bufferSize = 512);
 		~NetPacket();
 	public:
 		/**

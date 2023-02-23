@@ -1,11 +1,11 @@
 #ifndef __NETSERVEREX__H_
 #define __NETSERVEREX__H_
 #include "Base.h"
-#include "Define.h"
+#include "Session.h"
+#include "Content.h"
 #include "NetContent.h"
 #include "NetPacket.h"
 #include "LockFreeStack.h"
-#include "List.h"
 
 namespace Jay
 {
@@ -16,39 +16,20 @@ namespace Jay
 		* @brief	Network NetServer Extension Class
 		* @details	외부 네트워크의 게임 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
 		* @author	고재현
-		* @date		2023-02-20
-		* @version	1.0.0
+		* @date		2023-02-24
+		* @version	1.0.1
 		**/
-	private:
-		enum CONTENT_JOB_TYPE
-		{
-			JOB_TYPE_CONTENT_JOIN = 0
-		};
-		struct CONTENT_JOB
-		{
-			CONTENT_JOB_TYPE type;
-			DWORD64 sessionID;
-		};
-		struct CONTENT
-		{
-			NetContent* handler;
-			WORD contentID;
-			WORD frameInterval;
-			DWORD threadID;
-			List<DWORD64> sessionIDList;
-			LockFreeQueue<CONTENT_JOB*> jobQ;
-		};
 	public:
 		NetServerEx();
 		virtual ~NetServerEx();
 	public:
 		void AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool default = false);
 		bool SetFrameInterval(WORD contentID, WORD frameInterval);
-		bool Start(const wchar_t* ipaddress, int port, int workerCreateCnt, int workerRunningCnt, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
+		bool Start(const wchar_t* ipaddress, int port, int workerCreateCount, int workerRunningCount, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
 		void Stop();
 		bool Disconnect(DWORD64 sessionID);
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
-		bool MoveContent(DWORD64 sessionID, WORD contentID);
+		bool MoveContent(DWORD64 sessionID, WORD contentID, WPARAM wParam, LPARAM lParam);
 		int GetSessionCount();
 		int GetUsePacketCount();
 		int GetAcceptTPS();
@@ -57,8 +38,6 @@ namespace Jay
 		__int64 GetTotalAcceptCount();
 	protected:
 		virtual bool OnConnectionRequest(const wchar_t* ipaddress, int port) = 0;
-		virtual void OnClientJoin(DWORD64 sessionID) = 0;
-		virtual void OnClientLeave(DWORD64 sessionID) = 0;
 		virtual void OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam) = 0;
 	private:
 		SESSION* CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr);
@@ -80,9 +59,9 @@ namespace Jay
 		void UserMessageProc(DWORD message, LPVOID lpParam);
 		void TimeoutProc();
 		void UpdateTPS();
-		void TryMoveContent(SESSION* session, WORD contentID);
-		CONTENT* FindContentInfo(WORD contentID);
-		CONTENT* GetCurrentContentInfo();
+		void TryMoveContent(SESSION* session, WORD contentID, WPARAM wParam, LPARAM lParam);
+		CONTENT* FindContent(WORD contentID);
+		CONTENT* GetCurrentContent();
 		bool SessionJobProc(SESSION* session, NetContent* handler);
 		bool ContentJobProc(CONTENT* content);
 		void NotifyContent(CONTENT* content);
@@ -101,20 +80,20 @@ namespace Jay
 	private:
 		SESSION* _sessionArray;
 		WORD _sessionMax;
-		WORD _sessionCnt;
+		WORD _sessionCount;
 		DWORD64 _sessionKey;
 		LockFreeStack<WORD> _indexStack;
 		SOCKET _listenSocket;
 		HANDLE _hCompletionPort;
-		int _workerCreateCnt;
-		int _workerRunningCnt;
+		int _workerCreateCount;
+		int _workerRunningCount;
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
 		HANDLE* _hContentThread;
 		CONTENT _contentArray[MAX_CONTENT];
 		WORD _defaultContentIndex;
-		WORD _contentCnt;
+		WORD _contentCount;
 		DWORD _tlsContent;
 		DWORD _lastTimeoutProc;
 		int _timeoutSec;

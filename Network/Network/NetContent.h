@@ -16,10 +16,12 @@ namespace Jay
 		**/
 	public:
 		virtual ~NetContent() {}
-		virtual void OnUpdate() = 0;
-		virtual void OnContentJoin(DWORD64 sessionID) = 0;
-		virtual void OnContentLeave(DWORD64 sessionID) = 0;
+		virtual void OnClientJoin(DWORD64 sessionID) = 0;
+		virtual void OnClientLeave(DWORD64 sessionID) = 0;
+		virtual void OnContentEnter(DWORD64 sessionID, WPARAM wParam, LPARAM lParam) = 0;
+		virtual void OnContentExit(DWORD64 sessionID) = 0;
 		virtual void OnRecv(DWORD64 sessionID, NetPacket* packet) = 0;
+		virtual void OnUpdate() = 0;
 	};
 }
 

@@ -1,7 +1,7 @@
 #ifndef __NETCLIENT__H_
 #define __NETCLIENT__H_
 #include "Base.h"
-#include "Define.h"
+#include "Session.h"
 #include "NetPacket.h"
 
 namespace Jay

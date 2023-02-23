@@ -5,9 +5,10 @@
 #pragma comment(lib, "Winmm.lib")
 #pragma comment(lib, "Network.lib")
 
+//EchoServer g_EchoServer;
 EchoServerEx g_EchoServer;
-LoginServer g_LoginServer(&g_EchoServer);
-GameServer g_GameServer(&g_EchoServer);
+LoginServerEx g_LoginServer(&g_EchoServer);
+GameServerEx g_GameServer(&g_EchoServer);
 bool g_StopSignal = false;
 
 void Run();
@@ -31,9 +32,9 @@ void Run()
 {
 	wchar_t ip[16] = L"0.0.0.0";
 	int port = 40000;
-	int workerCreateCnt = 4;
+	int workerCreateCnt = 3;
 	int workerRunningCnt = 2;
-	WORD sessionMax = 60000;
+	WORD sessionMax = 6000;
 	BYTE packetCode = 119;
 	BYTE packetKey = 50;
 
@@ -68,8 +69,8 @@ Accept TPS: %d\n\
 Recv TPS: %d\n\
 Send TPS: %d\n\
 ------------------------------------\n\
-AuthServer FPS: %d\n\
-GameServer FPS: %d\n\
+Auth FPS: %d\n\
+Game FPS: %d\n\
 ------------------------------------\n\
 \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec
@@ -81,6 +82,7 @@ GameServer FPS: %d\n\
 		, g_EchoServer.GetSendTPS()
 		, g_LoginServer.GetFPS()
 		, g_GameServer.GetFPS());
+		//, g_EchoServer.GetFPS());
 }
 
 void Control()

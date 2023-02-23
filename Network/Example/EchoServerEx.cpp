@@ -12,12 +12,6 @@ bool EchoServerEx::OnConnectionRequest(const wchar_t* ipaddress, int port)
 {
 	return true;
 }
-void EchoServerEx::OnClientJoin(DWORD64 sessionID)
-{
-}
-void EchoServerEx::OnClientLeave(DWORD64 sessionID)
-{
-}
 void EchoServerEx::OnError(int errcode, const wchar_t* funcname, int linenum, WPARAM wParam, LPARAM lParam)
 {
 	tm stTime;
@@ -46,53 +40,68 @@ void EchoServerEx::OnError(int errcode, const wchar_t* funcname, int linenum, WP
 	fclose(pFile);
 }
 
-LoginServer::LoginServer(EchoServerEx* subject) : _subject(subject), _stopSignal(false)
+LoginServerEx::LoginServerEx(EchoServerEx* subject) : _subject(subject), _stopSignal(false)
 {
 	_subject->AttachContent(this, CONTENT_ID_AUTH, FRAME_INTERVAL_AUTH, true);
-	_managementThread = std::thread(&LoginServer::ManagementThread, this);
+	_managementThread = std::thread(&LoginServerEx::ManagementThread, this);
 }
-LoginServer::~LoginServer()
+LoginServerEx::~LoginServerEx()
 {
 	_stopSignal = true;
 	_managementThread.join();
 }
-int LoginServer::GetFPS()
+int LoginServerEx::GetFPS()
 {
 	return _oldFPS;
 }
-void LoginServer::OnUpdate()
+void LoginServerEx::OnUpdate()
 {
 	_curFPS++;
 }
-void LoginServer::OnContentJoin(DWORD64 sessionID)
+void LoginServerEx::OnClientJoin(DWORD64 sessionID)
 {
 }
-void LoginServer::OnContentLeave(DWORD64 sessionID)
+void LoginServerEx::OnClientLeave(DWORD64 sessionID)
 {
 }
-void LoginServer::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
+void LoginServerEx::OnContentEnter(DWORD64 sessionID, WPARAM wParam, LPARAM lParam)
+{
+}
+void LoginServerEx::OnContentExit(DWORD64 sessionID)
+{
+}
+void LoginServerEx::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
+{
+	WORD type;
+	(*packet) >> type;
+
+	switch (type)
+	{
+	case en_PACKET_CS_GAME_REQ_LOGIN:
+		LoginProc(sessionID, packet);
+		break;
+	default:
+		Jay::CrashDump::Crash();
+		break;
+	}
+}
+void LoginServerEx::LoginProc(DWORD64 sessionID, Jay::NetPacket* packet)
 {
 	//--------------------------------------------------------------------
 	// Packet Deserialize
 	//--------------------------------------------------------------------
-	WORD type;
-	(*packet) >> type;
-	if (type != en_PACKET_CS_GAME_REQ_LOGIN)
-		Jay::CrashDump::Crash();
-
 	INT64 accountNo;
 	char sessionKey[64];
 	int version;
 	(*packet) >> accountNo;
 	if (packet->GetData(sessionKey, sizeof(sessionKey)) != sizeof(sessionKey))
 		Jay::CrashDump::Crash();
-
 	(*packet) >> version;
 
 	//--------------------------------------------------------------------
-	// Move Content To GameServer
+	// Move Content To GameServerEx
 	//--------------------------------------------------------------------
-	_subject->MoveContent(sessionID, CONTENT_ID_GAME);
+	_subject->MoveContent(sessionID, CONTENT_ID_GAME, NULL, NULL);
 
 	//--------------------------------------------------------------------
 	// Packet Serialize
@@ -108,7 +117,7 @@ void LoginServer::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
 
 	Jay::NetPacket::Free(resPacket);
 }
-void LoginServer::ManagementThread()
+void LoginServerEx::ManagementThread()
 {
 	while (!_stopSignal)
 	{
@@ -117,50 +126,58 @@ void LoginServer::ManagementThread()
 	}
 }
 
-GameServer::GameServer(EchoServerEx* subject) : _subject(subject), _stopSignal(false)
+GameServerEx::GameServerEx(EchoServerEx* subject) : _subject(subject), _stopSignal(false)
 {
 	_subject->AttachContent(this, CONTENT_ID_GAME, FRAME_INTERVAL_GAME);
-	_managementThread = std::thread(&GameServer::ManagementThread, this);
+	_managementThread = std::thread(&GameServerEx::ManagementThread, this);
 }
-GameServer::~GameServer()
+GameServerEx::~GameServerEx()
 {
 	_stopSignal = true;
 	_managementThread.join();
 }
-int GameServer::GetFPS()
+int GameServerEx::GetFPS()
 {
 	return _oldFPS;
 }
-void GameServer::OnUpdate()
+void GameServerEx::OnUpdate()
 {
 	_curFPS++;
 }
-void GameServer::OnContentJoin(DWORD64 sessionID)
+void GameServerEx::OnClientJoin(DWORD64 sessionID)
 {
 }
-void GameServer::OnContentLeave(DWORD64 sessionID)
+void GameServerEx::OnClientLeave(DWORD64 sessionID)
 {
 }
-void GameServer::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
+void GameServerEx::OnContentEnter(DWORD64 sessionID, WPARAM wParam, LPARAM lParam)
 {
-	//--------------------------------------------------------------------
-	// Packet Deserialize
-	//--------------------------------------------------------------------
+}
+void GameServerEx::OnContentExit(DWORD64 sessionID)
+{
+}
+void GameServerEx::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
+{
 	WORD type;
 	(*packet) >> type;
 
 	switch (type)
 	{
 	case en_PACKET_CS_GAME_REQ_ECHO:
-		// do nothing
+		PacketProc_Echo(sessionID, packet);
 		break;
 	case en_PACKET_CS_GAME_REQ_HEARTBEAT:
-		return;
+		break;
 	default:
 		Jay::CrashDump::Crash();
-		return;
+		break;
 	}
-
+}
+void GameServerEx::PacketProc_Echo(DWORD64 sessionID, Jay::NetPacket* packet)
+{
+	//--------------------------------------------------------------------
+	// Packet Deserialize
+	//--------------------------------------------------------------------
 	INT64 accountNo;
 	LONGLONG sendTick;
 	(*packet) >> accountNo;
@@ -178,7 +195,7 @@ void GameServer::OnRecv(DWORD64 sessionID, Jay::NetPacket* packet)
 
 	Jay::NetPacket::Free(resPacket);
 }
-void GameServer::ManagementThread()
+void GameServerEx::ManagementThread()
 {
 	while (!_stopSignal)
 	{

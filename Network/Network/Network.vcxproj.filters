@@ -93,6 +93,12 @@
     <ClInclude Include="NetContent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Session.h">
+      <Filter>Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Content.h">
+      <Filter>Base</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RingBuffer.cpp">
