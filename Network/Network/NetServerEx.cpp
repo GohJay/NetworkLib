@@ -310,7 +310,7 @@ void NetServerEx::CloseSession(SESSION* session)
 	// IO Count 瞒皑 蔼捞 0老 版快 技记 副府令 夸没
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
-		QueueUserMessage(UM_POST_SESSION_RELEASE, session);
+		ReleaseSession(session);
 }
 void NetServerEx::RecvPost(SESSION* session)
 {
@@ -603,8 +603,7 @@ void NetServerEx::TrySendPacket(SESSION* session, NetPacket* packet)
 	//--------------------------------------------------------------------
 	// 价脚 夸没
 	//--------------------------------------------------------------------
-	IncrementIOCount(session);
-	QueueUserMessage(UM_POST_SEND_PACKET, session);
+	SendPost(session);
 }
 void NetServerEx::ClearSendPacket(SESSION* session)
 {
