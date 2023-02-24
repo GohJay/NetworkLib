@@ -17,15 +17,13 @@ NetServerEx::NetServerEx() : _sessionCount(0), _sessionKey(0), _defaultContentIn
 	WSADATA ws;
 	int status = WSAStartup(MAKEWORD(2, 2), &ws);
 	if (status != 0)
+	{
 		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, status);
-
-	_tlsContent = TlsAlloc();
-	if (_tlsContent == TLS_OUT_OF_INDEXES)
-		Logger::WriteLog(L"Net", LOG_LEVEL_SYSTEM, L"%s() line: %d - error: %d", __FUNCTIONW__, __LINE__, GetLastError());
+		return;
+	}
 }
 NetServerEx::~NetServerEx()
 {
-	TlsFree(_tlsContent);
 	WSACleanup();
 }
 void NetServerEx::AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool default)
@@ -768,10 +766,9 @@ void NetServerEx::TryMoveContent(SESSION* session, WORD contentID, WPARAM wParam
 }
 CONTENT* NetServerEx::FindContent(WORD contentID)
 {
-	CONTENT* content;
 	for (int index = 0; index < _contentCount; index++)
 	{
-		content = &_contentArray[index];
+		CONTENT* content = &_contentArray[index];
 		if (content->contentID == contentID)
 			return content;
 	}
@@ -779,21 +776,14 @@ CONTENT* NetServerEx::FindContent(WORD contentID)
 }
 CONTENT* NetServerEx::GetCurrentContent()
 {
-	CONTENT* content = (CONTENT*)TlsGetValue(_tlsContent);
-	if (content == NULL)
+	DWORD threadID = GetCurrentThreadId();
+	for (int index = 0; index < _contentCount; index++)
 	{
-		DWORD threadID = GetCurrentThreadId();
-		for (int index = 0; index < _contentCount; index++)
-		{
-			if (_contentArray[index].threadID == threadID)
-			{
-				content = &_contentArray[index];
-				TlsSetValue(_tlsContent, content);
-				break;
-			}
-		}
+		CONTENT* content = &_contentArray[index];
+		if (content->threadID == threadID)
+			return content;
 	}
-	return content;
+	return nullptr;
 }
 bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 {

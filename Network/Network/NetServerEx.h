@@ -94,7 +94,6 @@ namespace Jay
 		CONTENT _contentArray[MAX_CONTENT];
 		WORD _defaultContentIndex;
 		WORD _contentCount;
-		DWORD _tlsContent;
 		DWORD _lastTimeoutProc;
 		int _timeoutSec;
 		MONITORING _monitoring;
