@@ -2,7 +2,7 @@
 #define  __OBJECT_POOL_TLS__H_
 #include "ObjectPool.h"
 
-#define CHUNK_UNIT		500
+#define CHUNK_UNIT		300
 
 namespace Jay
 {

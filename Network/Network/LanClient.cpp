@@ -124,7 +124,7 @@ bool LanClient::Connect(const wchar_t* ipaddress, int port, bool nagle)
 	//--------------------------------------------------------------------
 	// 할당된 세션을 IOCP에 등록
 	//--------------------------------------------------------------------
-	CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)&session, NULL);
+	CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 	//--------------------------------------------------------------------
 	// 연결 정보를 컨텐츠 부에 알리고 수신 등록
@@ -192,7 +192,7 @@ void LanClient::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 컨텐츠 부에 알림
 	//--------------------------------------------------------------------
-	OnEnterJoinServer();
+	OnLeaveServer();
 }
 void LanClient::DisconnectSession(SESSION* session)
 {

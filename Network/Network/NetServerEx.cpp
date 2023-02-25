@@ -307,7 +307,7 @@ void NetServerEx::IncrementIOCount(SESSION* session)
 void NetServerEx::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
-	// IO Count 차감 값이 0일 경우 세션 릴리즈 요청
+	// IO Count 차감 값이 0일 경우 세션 릴리즈 처리
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
 		ReleaseSession(session);
@@ -554,13 +554,12 @@ int NetServerEx::CompleteRecvPacket(SESSION* session)
 	sessionJob->lpParam1 = packet;
 
 	//--------------------------------------------------------------------
-	// 세션 Job 큐잉
+	// 세션에 메시지 수신 Job 큐잉
 	//--------------------------------------------------------------------
 	packet->IncrementRefCount();
 	session->jobQ.Enqueue(sessionJob);
 
 	NetPacket::Free(packet);
-	InterlockedIncrement(&_monitoring.curTPS.recv);
 	return 0;
 }
 void NetServerEx::CompleteSendPacket(SESSION* session)
@@ -601,7 +600,7 @@ void NetServerEx::TrySendPacket(SESSION* session, NetPacket* packet)
 	session->sendQ.Enqueue(packet);
 
 	//--------------------------------------------------------------------
-	// 송신 요청
+	// 송신 처리
 	//--------------------------------------------------------------------
 	SendPost(session);
 }
@@ -755,6 +754,7 @@ void NetServerEx::TryMoveContent(SESSION* session, WORD contentID, WPARAM wParam
 		return;
 	}
 
+	// 세션 이동 정보 Job 큐잉
 	SESSION_JOB* sessionJob = _sessionJobPool.Alloc();
 	sessionJob->type = JOB_TYPE_SESSION_MOVE;
 	sessionJob->sessionID = session->sessionID;
@@ -787,7 +787,7 @@ CONTENT* NetServerEx::GetCurrentContent()
 bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 {
 	//--------------------------------------------------------------------
-	// 컨텐츠에 등록되어있는 세션들의 잡 큐 처리
+	// 컨텐츠 스레드에 등록되어있는 세션들의 잡 큐 처리
 	//--------------------------------------------------------------------
 	bool ret = true;
 	
@@ -803,9 +803,7 @@ bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 				NetPacket* packet = (NetPacket*)sessionJob->lpParam1;
 				try
 				{
-					//--------------------------------------------------------------------
-					// 컨텐츠 부에 직렬화 버퍼 전달
-					//--------------------------------------------------------------------
+					// 메시지 수신 정보 이벤트 호출
 					handler->OnRecv(session->sessionID, packet);
 				}
 				catch (NetException& ex)
@@ -814,6 +812,7 @@ bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 					DisconnectSession(session);
 				}
 				NetPacket::Free(packet);
+				InterlockedIncrement(&_monitoring.curTPS.recv);
 			}
 			break;
 		case JOB_TYPE_SESSION_MOVE:
@@ -821,14 +820,10 @@ bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 				CONTENT* content = FindContent((WORD)sessionJob->lpParam1);
 				if (handler != content->handler)
 				{
-					//--------------------------------------------------------------------
-					// 컨텐츠 부에 퇴장 정보 알림
-					//--------------------------------------------------------------------
+					// 컨텐츠 퇴장 정보 이벤트 호출
 					handler->OnContentExit(session->sessionID);
 					
-					//--------------------------------------------------------------------
-					// 컨텐츠 이동 정보 Job 큐잉
-					//--------------------------------------------------------------------
+					// 컨텐츠 스레드에 세션 이동 정보 Job 큐잉
 					CONTENT_JOB* contentJob = _contentJobPool.Alloc();
 					contentJob->type = JOB_TYPE_CONTENT_ENTER;
 					contentJob->sessionID = session->sessionID;
@@ -852,7 +847,7 @@ bool NetServerEx::SessionJobProc(SESSION* session, NetContent* handler)
 bool NetServerEx::ContentJobProc(CONTENT* content)
 {
 	//--------------------------------------------------------------------
-	// 컨텐츠 잡 큐 처리
+	// 컨텐츠 스레드의 잡 큐 처리
 	//--------------------------------------------------------------------
 	CONTENT_JOB* contentJob;
 
@@ -863,10 +858,10 @@ bool NetServerEx::ContentJobProc(CONTENT* content)
 		switch (contentJob->type)
 		{
 		case JOB_TYPE_CLIENT_JOIN:
-			// 컨텐츠 부에 접속 정보 알림
+			// 서버 접속 정보 이벤트 호출
 			content->handler->OnClientJoin(contentJob->sessionID);
 		case JOB_TYPE_CONTENT_ENTER:
-			// 컨텐츠 부에 입장 정보 알림
+			// 컨텐츠 입장 정보 이벤트 호출
 			content->handler->OnContentEnter(contentJob->sessionID, contentJob->wParam, contentJob->lParam);
 			content->sessionIDList.push_back(contentJob->sessionID);
 			break;
@@ -882,12 +877,12 @@ bool NetServerEx::ContentJobProc(CONTENT* content)
 void NetServerEx::NotifyContent(CONTENT* content)
 {
 	//--------------------------------------------------------------------
-	// 컨텐츠 잡 큐 처리
+	// 컨텐츠 스레드의 잡 큐 처리
 	//--------------------------------------------------------------------
 	ContentJobProc(content);
 
 	//--------------------------------------------------------------------
-	// 컨텐츠에 등록되어있는 세션들의 잡 큐 처리
+	// 컨텐츠 스레드에 등록되어있는 세션들의 잡 큐 처리
 	//--------------------------------------------------------------------
 	for (auto iter = content->sessionIDList.begin(); iter != content->sessionIDList.end();)
 	{
@@ -895,6 +890,7 @@ void NetServerEx::NotifyContent(CONTENT* content)
 		SESSION* session = DuplicateSession(sessionID);
 		if (session == nullptr)
 		{
+			// 서버 퇴장 정보 이벤트 호출
 			content->handler->OnClientLeave(sessionID);
 			iter = content->sessionIDList.erase(iter);
 			continue;
@@ -909,7 +905,7 @@ void NetServerEx::NotifyContent(CONTENT* content)
 	}
 
 	//--------------------------------------------------------------------
-	// 컨텐츠 업데이트 알림
+	// 컨텐츠 업데이트 이벤트 호출
 	//--------------------------------------------------------------------
 	content->handler->OnUpdate();
 }
@@ -1089,10 +1085,9 @@ unsigned int NetServerEx::AcceptThread()
 		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
-		// Default 컨텐츠에 신규 세션의 접속 정보 알림
+		// Default 컨텐츠에 신규 접속 정보 Job 큐잉
 		//--------------------------------------------------------------------
-		CONTENT_JOB* contentJob;
-		contentJob = _contentJobPool.Alloc();
+		CONTENT_JOB* contentJob = _contentJobPool.Alloc();
 		contentJob->type = JOB_TYPE_CLIENT_JOIN;
 		contentJob->sessionID = session->sessionID;
 		contentJob->wParam = NULL;
