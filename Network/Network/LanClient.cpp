@@ -285,6 +285,7 @@ void LanClient::RecvPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}
@@ -366,6 +367,7 @@ void LanClient::SendPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}

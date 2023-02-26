@@ -39,9 +39,6 @@
     <ClInclude Include="Define.h">
       <Filter>Base</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectPool.h">
-      <Filter>Common</Filter>
-    </ClInclude>
     <ClInclude Include="Error.h">
       <Filter>Base</Filter>
     </ClInclude>
@@ -56,9 +53,6 @@
     </ClInclude>
     <ClInclude Include="User.h">
       <Filter>Base</Filter>
-    </ClInclude>
-    <ClInclude Include="ObjectPool_TLS.h">
-      <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="FileUtil.h">
       <Filter>Common</Filter>
@@ -98,6 +92,12 @@
     </ClInclude>
     <ClInclude Include="Content.h">
       <Filter>Base</Filter>
+    </ClInclude>
+    <ClInclude Include="LFObjectPool.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="LFObjectPool_TLS.h">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

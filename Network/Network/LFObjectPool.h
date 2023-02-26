@@ -1,5 +1,5 @@
-#ifndef  __OBJECT_POOL__H_
-#define  __OBJECT_POOL__H_
+#ifndef  __LFOBJECT_POOL__H_
+#define  __LFOBJECT_POOL__H_
 #ifdef _WIN64
 
 #define SECURE_MODE					1
@@ -19,10 +19,10 @@
 namespace Jay
 {
 	/**
-	* @file		ObjectPool.h
+	* @file		LFObjectPool.h
 	* @brief	오브젝트 메모리 풀 클래스(오브젝트 풀 / 프리리스트)
 	* @details	특정 데이터를(구조체, 클래스, 변수) 일정량 할당 후 나눠쓴다.
-	* @usage	Jay::ObjectPool<T> MemPool(300, false);
+	* @usage	Jay::LFObjectPool<T> MemPool(300, false);
 				T *pData = MemPool.Alloc();
 				pData 사용
 				MemPool.Free(pData);
@@ -31,7 +31,7 @@ namespace Jay
 	* @version	1.1.3
 	**/
 	template <typename T>
-	class ObjectPool
+	class LFObjectPool
 	{
 	private:
 		struct NODE
@@ -47,9 +47,9 @@ namespace Jay
 		* @brief	생성자, 소멸자
 		* @details
 		* @param	int(초기 블럭 개수), bool(Alloc 시 생성자 / Free 시 파괴자 호출 여부)
-		* @return
+		* @return	
 		**/
-		ObjectPool(int blockNum, bool placementNew = false) 
+		LFObjectPool(int blockNum, bool placementNew = false) 
 			: _top(nullptr), _placementNew(placementNew), _capacity(0), _useCount(0)
 		{
 			NODE* node; 
@@ -71,7 +71,7 @@ namespace Jay
 				blockNum--;
 			}
 		}
-		~ObjectPool()
+		~LFObjectPool()
 		{
 			NODE* prev;
 			_top = (NODE*)GET_NODE_ADDRESS(_top);

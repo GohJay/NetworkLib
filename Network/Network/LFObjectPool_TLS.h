@@ -1,16 +1,16 @@
-#ifndef  __OBJECT_POOL_TLS__H_
-#define  __OBJECT_POOL_TLS__H_
-#include "ObjectPool.h"
+#ifndef  __LFOBJECT_POOL_TLS__H_
+#define  __LFOBJECT_POOL_TLS__H_
+#include "LFObjectPool.h"
 
 #define CHUNK_UNIT		300
 
 namespace Jay
 {
 	/**
-	* @file		ObjectPool_TLS.h
+	* @file		LFObjectPool_TLS.h
 	* @brief	오브젝트 메모리 풀 클래스(오브젝트 풀 / 프리리스트) TLS 버전
 	* @details	특정 데이터를(구조체, 클래스, 변수) 일정량 스레드별로 할당 후 나눠쓴다.
-	* @usage	Jay::ObjectPool_TLS<T> MemPool(300, false);
+	* @usage	Jay::LFObjectPool_TLS<T> MemPool(300, false);
 				T *pData = MemPool.Alloc();
 				pData 사용
 				MemPool.Free(pData);
@@ -19,7 +19,7 @@ namespace Jay
 	* @version	1.0.0
 	**/
 	template <typename T>
-	class ObjectPool_TLS
+	class LFObjectPool_TLS
 	{
 	private:
 		struct NODE
@@ -45,12 +45,14 @@ namespace Jay
 		* @param	int(초기 청크 개수), bool(Alloc 시 생성자 / Free 시 파괴자 호출 여부)
 		* @return	
 		**/
-		ObjectPool_TLS(int chunkNum, bool placementNew = false) 
+		LFObjectPool_TLS(int chunkNum, bool placementNew = false)
 			: _chunkPool(chunkNum, placementNew)
 		{
 			_tlsChunk = TlsAlloc();
+			if (_tlsChunk == TLS_OUT_OF_INDEXES)
+				throw;
 		}
-		~ObjectPool_TLS()
+		~LFObjectPool_TLS()
 		{
 			TlsFree(_tlsChunk);
 		}
@@ -133,7 +135,7 @@ namespace Jay
 		}
 	private:
 		DWORD _tlsChunk;
-		ObjectPool<CHUNK> _chunkPool;
+		LFObjectPool<CHUNK> _chunkPool;
 	};
 }
 

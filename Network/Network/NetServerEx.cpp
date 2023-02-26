@@ -186,9 +186,13 @@ int NetServerEx::GetSessionCount()
 {
 	return _sessionCount;
 }
-int NetServerEx::GetUsePacketCount()
+int NetServerEx::GetUsePacketPool()
 {
 	return NetPacket::_packetPool.GetUseCount();
+}
+int NetServerEx::GetCapacityPacketPool()
+{
+	return NetPacket::_packetPool.GetCapacityCount();
 }
 int NetServerEx::GetAcceptTPS()
 {
@@ -365,6 +369,7 @@ void NetServerEx::RecvPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}
@@ -446,6 +451,7 @@ void NetServerEx::SendPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}

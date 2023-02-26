@@ -137,9 +137,13 @@ int LanServer::GetSessionCount()
 {
 	return _sessionCount;
 }
-int LanServer::GetUsePacketCount()
+int LanServer::GetUsePacketPool()
 {
 	return NetPacket::_packetPool.GetUseCount();
+}
+int LanServer::GetCapacityPacketPool()
+{
+	return NetPacket::_packetPool.GetCapacityCount();
 }
 __int64 LanServer::GetTotalAcceptCount()
 {
@@ -205,7 +209,7 @@ void LanServer::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 컨텐츠 부에 알림
 	//--------------------------------------------------------------------
-	OnClientLeave(session->sessionID);
+	QueueUserMessage(UM_POST_SESSION_RELEASE, (LPVOID)session->sessionID);
 
 	//--------------------------------------------------------------------
 	// 세션 인덱스 반환
@@ -265,7 +269,7 @@ void LanServer::CloseSession(SESSION* session)
 	// IO Count 차감 값이 0일 경우 세션 릴리즈 요청
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
-		QueueUserMessage(UM_POST_SESSION_RELEASE, session);
+		ReleaseSession(session);
 }
 void LanServer::RecvPost(SESSION* session)
 {
@@ -319,6 +323,7 @@ void LanServer::RecvPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}
@@ -400,6 +405,7 @@ void LanServer::SendPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}
@@ -597,8 +603,8 @@ void LanServer::UserMessageProc(DWORD message, LPVOID lpParam)
 		break;
 	case UM_POST_SESSION_RELEASE:
 		{
-			SESSION* session = (SESSION*)lpParam;
-			ReleaseSession(session);
+			DWORD64 sessionID = (DWORD64)lpParam;
+			OnClientLeave(sessionID);
 		}
 		break;
 	default:

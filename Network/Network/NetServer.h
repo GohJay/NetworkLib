@@ -14,8 +14,8 @@ namespace Jay
 		* @brief	Network NetServer Class
 		* @details	외부 네트워크의 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
 		* @author	고재현
-		* @date		2023-01-22
-		* @version	1.0.1
+		* @date		2023-02-26
+		* @version	1.0.2
 		**/
 	public:
 		NetServer();
@@ -26,7 +26,8 @@ namespace Jay
 		bool Disconnect(DWORD64 sessionID);
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
 		int GetSessionCount();
-		int GetUsePacketCount();
+		int GetUsePacketPool();
+		int GetCapacityPacketPool();
 		int GetAcceptTPS();
 		int GetRecvTPS();
 		int GetSendTPS();

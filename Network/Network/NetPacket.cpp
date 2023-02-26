@@ -7,7 +7,7 @@
 
 using namespace Jay;
 
-ObjectPool_TLS<NetPacket> NetPacket::_packetPool(0, false);
+LFObjectPool_TLS<NetPacket> NetPacket::_packetPool(0, false);
 NetPacket::NetPacket(int bufferSize) : _bufferSize(bufferSize), _refCount(0)
 {
 	_buffer = (char*)malloc(_bufferSize + PACKET_HEADER_SIZE);

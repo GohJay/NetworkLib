@@ -143,6 +143,8 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="LanClient.h" />
+    <ClInclude Include="LFObjectPool.h" />
+    <ClInclude Include="LFObjectPool_TLS.h" />
     <ClInclude Include="Lock.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
@@ -151,14 +153,12 @@
     <ClInclude Include="NetContent.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="NetServerEx.h" />
-    <ClInclude Include="ObjectPool_TLS.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="User.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="NetPacket.h" />
     <ClInclude Include="NetPacketPtr.h" />
-    <ClInclude Include="ObjectPool.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RingBuffer.h" />
   </ItemGroup>

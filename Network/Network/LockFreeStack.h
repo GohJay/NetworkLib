@@ -1,6 +1,6 @@
 #ifndef __LOCK_FREE_STACK__H_
 #define __LOCK_FREE_STACK__H_
-#include "ObjectPool.h"
+#include "LFObjectPool.h"
 
 namespace Jay
 {
@@ -90,7 +90,7 @@ namespace Jay
     private:
         NODE* _top;
         long _count;
-        ObjectPool<NODE> _nodePool;
+        LFObjectPool<NODE> _nodePool;
     };
 }
 

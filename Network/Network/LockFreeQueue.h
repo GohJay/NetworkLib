@@ -1,6 +1,6 @@
 #ifndef __LOCK_FREE_QUEUE__H_
 #define __LOCK_FREE_QUEUE__H_
-#include "ObjectPool.h"
+#include "LFObjectPool.h"
 
 namespace Jay
 {
@@ -127,7 +127,7 @@ namespace Jay
         NODE* _head;
         NODE* _tail;
         long _count;
-        ObjectPool<NODE> _nodePool;
+        LFObjectPool<NODE> _nodePool;
     };
 }
 

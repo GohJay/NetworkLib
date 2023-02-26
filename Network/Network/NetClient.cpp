@@ -288,6 +288,7 @@ void NetClient::RecvPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}
@@ -369,6 +370,7 @@ void NetClient::SendPost(SESSION* session)
 				break;
 			}
 
+			DisconnectSession(session);
 			CloseSession(session);
 			return;
 		}

@@ -16,8 +16,8 @@ namespace Jay
 		* @brief	Network NetServer Extension Class
 		* @details	외부 네트워크의 게임 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
 		* @author	고재현
-		* @date		2023-02-24
-		* @version	1.0.1
+		* @date		2023-02-26
+		* @version	1.0.2
 		**/
 	public:
 		NetServerEx();
@@ -31,7 +31,8 @@ namespace Jay
 		bool SendPacket(DWORD64 sessionID, NetPacket* packet);
 		bool MoveContent(DWORD64 sessionID, WORD contentID, WPARAM wParam, LPARAM lParam);
 		int GetSessionCount();
-		int GetUsePacketCount();
+		int GetUsePacketPool();
+		int GetCapacityPacketPool();
 		int GetAcceptTPS();
 		int GetRecvTPS();
 		int GetSendTPS();
@@ -100,8 +101,8 @@ namespace Jay
 		BYTE _packetCode;
 		BYTE _packetKey;
 		volatile bool _stopSignal;
-		ObjectPool_TLS<SESSION_JOB> _sessionJobPool;
-		ObjectPool_TLS<CONTENT_JOB> _contentJobPool;
+		LFObjectPool_TLS<SESSION_JOB> _sessionJobPool;
+		LFObjectPool_TLS<CONTENT_JOB> _contentJobPool;
 	};
 }
 

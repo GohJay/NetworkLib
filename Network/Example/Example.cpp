@@ -75,7 +75,7 @@ Game FPS: %d\n\
 \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec
 		, g_EchoServer.GetSessionCount()
-		, g_EchoServer.GetUsePacketCount()
+		, g_EchoServer.GetUsePacketPool()
 		, g_EchoServer.GetTotalAcceptCount()
 		, g_EchoServer.GetAcceptTPS()
 		, g_EchoServer.GetRecvTPS()

@@ -1,7 +1,7 @@
 #ifndef __NETPACKET__H_
 #define __NETPACKET__H_
 #include "Base.h"
-#include "ObjectPool_TLS.h"
+#include "LFObjectPool_TLS.h"
 
 namespace Jay
 {
@@ -248,8 +248,8 @@ namespace Jay
 		int _bufferSize;
 		long _refCount;
 		bool _encode;
-		static ObjectPool_TLS<NetPacket> _packetPool;
-		friend class ObjectPool_TLS<NetPacket>;
+		static LFObjectPool_TLS<NetPacket> _packetPool;
+		friend class LFObjectPool_TLS<NetPacket>;
 		friend class NetPacketPtr;
 		friend class NetServerEx;
 		friend class NetServer;

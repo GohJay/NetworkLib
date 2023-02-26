@@ -1,7 +1,7 @@
 #pragma once
 #include "../Network/NetServer.h"
 #include "../Network/LockFreeQueue.h"
-#include "../Network/ObjectPool_TLS.h"
+#include "../Network/LFObjectPool_TLS.h"
 #include <thread>
 #include <unordered_map>
 
@@ -50,9 +50,9 @@ private:
 	void ManagementThread();
 private:
 	std::unordered_map<SESSION_ID, PLAYER*> _playerMap;
-	Jay::ObjectPool_TLS<PLAYER> _playerPool;
+	Jay::LFObjectPool_TLS<PLAYER> _playerPool;
 	Jay::LockFreeQueue<JOB*> _jobQ[JOBQUEUE_SIZE];
-	Jay::ObjectPool_TLS<JOB> _jobPool;
+	Jay::LFObjectPool_TLS<JOB> _jobPool;
 	std::atomic<int> _oldFPS;
 	std::atomic<int> _curFPS;
 	std::thread _updateThread;
