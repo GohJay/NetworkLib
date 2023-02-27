@@ -84,10 +84,13 @@ namespace Jay
 		WORD _sessionCount;
 		DWORD64 _sessionKey;
 		LockFreeStack<WORD> _indexStack;
-		SOCKET _listenSocket;
-		HANDLE _hCompletionPort;
 		int _workerCreateCount;
 		int _workerRunningCount;
+		int _timeoutSec;
+		BYTE _packetCode;
+		BYTE _packetKey;
+		SOCKET _listenSocket;
+		HANDLE _hCompletionPort;
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
@@ -96,10 +99,7 @@ namespace Jay
 		WORD _defaultContentIndex;
 		WORD _contentCount;
 		DWORD _lastTimeoutProc;
-		int _timeoutSec;
 		MONITORING _monitoring;
-		BYTE _packetCode;
-		BYTE _packetKey;
 		volatile bool _stopSignal;
 		LFObjectPool_TLS<SESSION_JOB> _sessionJobPool;
 		LFObjectPool_TLS<CONTENT_JOB> _contentJobPool;

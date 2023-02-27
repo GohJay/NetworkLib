@@ -73,15 +73,15 @@ namespace Jay
 		WORD _sessionCount;
 		DWORD64 _sessionKey;
 		LockFreeStack<WORD> _indexStack;
-		SOCKET _listenSocket;
-		HANDLE _hCompletionPort;
 		int _workerCreateCount;
 		int _workerRunningCount;
+		int _timeoutSec;
+		SOCKET _listenSocket;
+		HANDLE _hCompletionPort;
 		HANDLE* _hWorkerThread;
 		HANDLE _hAcceptThread;
 		HANDLE _hManagementThread;
 		DWORD _lastTimeoutProc;
-		int _timeoutSec;
 		MONITORING _monitoring;
 		volatile bool _stopSignal;
 	};

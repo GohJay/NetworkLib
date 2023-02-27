@@ -13,8 +13,8 @@ namespace Jay
 		* @brief	Network LanClient Class
 		* @details	외부 네트워크의 서버와 통신을 목적으로한 IOCP 클라이언트 클래스
 		* @author	고재현
-		* @date		2023-01-24
-		* @version	1.0.0
+		* @date		2023-02-27
+		* @version	1.0.1
 		**/
 	public:
 		LanClient();
