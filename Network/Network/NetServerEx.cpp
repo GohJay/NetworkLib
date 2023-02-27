@@ -669,12 +669,6 @@ void NetServerEx::UserMessageProc(DWORD message, LPVOID lpParam)
 			CloseSession(session);
 		}
 		break;
-	case UM_POST_SESSION_RELEASE:
-		{
-			SESSION* session = (SESSION*)lpParam;
-			ReleaseSession(session);
-		}
-		break;
 	default:
 		break;
 	}

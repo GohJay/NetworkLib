@@ -209,7 +209,7 @@ void LanServer::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// ƒ¡≈Ÿ√˜ ∫Œø° æÀ∏≤
 	//--------------------------------------------------------------------
-	QueueUserMessage(UM_POST_SESSION_RELEASE, (LPVOID)session->sessionID);
+	QueueUserMessage(UM_ALERT_CLIENT_LEAVE, (LPVOID)session->sessionID);
 
 	//--------------------------------------------------------------------
 	// ººº« ¿Œµ¶Ω∫ π›»Ø
@@ -601,7 +601,7 @@ void LanServer::UserMessageProc(DWORD message, LPVOID lpParam)
 			CloseSession(session);
 		}
 		break;
-	case UM_POST_SESSION_RELEASE:
+	case UM_ALERT_CLIENT_LEAVE:
 		{
 			DWORD64 sessionID = (DWORD64)lpParam;
 			OnClientLeave(sessionID);

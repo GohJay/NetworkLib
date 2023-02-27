@@ -192,7 +192,7 @@ void LanClient::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// ÄÁÅÙÃ÷ ºÎ¿¡ ¾Ë¸²
 	//--------------------------------------------------------------------
-	QueueUserMessage(UM_POST_SESSION_RELEASE, (LPVOID)session->sessionID);
+	QueueUserMessage(UM_ALERT_SERVER_LEAVE, NULL);
 }
 void LanClient::DisconnectSession(SESSION* session)
 {
@@ -560,10 +560,9 @@ void LanClient::UserMessageProc(DWORD message, LPVOID lpParam)
 			CloseSession(session);
 		}
 		break;
-	case UM_POST_SESSION_RELEASE:
+	case UM_ALERT_SERVER_LEAVE:
 		{
-			SESSION* session = (SESSION*)lpParam;
-			ReleaseSession(session);
+			OnLeaveServer();
 		}
 		break;
 	default:
