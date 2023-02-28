@@ -3,7 +3,7 @@
 #include "Define.h"
 #include "RingBuffer.h"
 #include "NetPacket.h"
-#include "LockFreeQueue.h"
+#include "LFQueue.h"
 
 #define SESSIONID_INDEX_MASK            0x000000000000FFFF
 #define SESSIONID_KEY_MASK              0xFFFFFFFFFFFF0000
@@ -46,8 +46,8 @@ struct alignas(64) SESSION
 	SHORT sendBufCount;
 	Jay::NetPacket** sendBuf;
 	Jay::RingBuffer recvQ;
-	Jay::LockFreeQueue<Jay::NetPacket*> sendQ;
-	Jay::LockFreeQueue<SESSION_JOB*> jobQ;
+	Jay::LFQueue<Jay::NetPacket*> sendQ;
+	Jay::LFQueue<SESSION_JOB*> jobQ;
 
 	SESSION() {
 		release = TRUE;

@@ -5,7 +5,7 @@
 #include "Content.h"
 #include "NetContent.h"
 #include "NetPacket.h"
-#include "LockFreeStack.h"
+#include "LFStack.h"
 
 namespace Jay
 {
@@ -83,7 +83,7 @@ namespace Jay
 		WORD _sessionMax;
 		WORD _sessionCount;
 		DWORD64 _sessionKey;
-		LockFreeStack<WORD> _indexStack;
+		LFStack<WORD> _indexStack;
 		int _workerCreateCount;
 		int _workerRunningCount;
 		int _timeoutSec;

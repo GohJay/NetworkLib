@@ -57,10 +57,10 @@
     <ClInclude Include="FileUtil.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="LockFreeQueue.h">
+    <ClInclude Include="LFQueue.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="LockFreeStack.h">
+    <ClInclude Include="LFStack.h">
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="Enviroment.h">

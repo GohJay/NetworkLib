@@ -34,7 +34,7 @@ void Run()
 	int port = 40000;
 	int workerCreateCnt = 3;
 	int workerRunningCnt = 2;
-	WORD sessionMax = 6000;
+	WORD sessionMax = 5000;
 	BYTE packetCode = 119;
 	BYTE packetKey = 50;
 
@@ -61,8 +61,9 @@ void Monitor()
 	wprintf_s(L"\
 [%d/%02d/%02d %02d:%02d:%02d]\n\
 ------------------------------------\n\
-Session Count: %d\n\
+PacketPool Capacity: %d\n\
 PacketPool Use: %d\n\
+Session Count: %d\n\
 ------------------------------------\n\
 Total Accept: %lld\n\
 Accept TPS: %d\n\
@@ -72,10 +73,11 @@ Send TPS: %d\n\
 Auth FPS: %d\n\
 Game FPS: %d\n\
 ------------------------------------\n\
-\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 		, stTime.tm_year + 1900, stTime.tm_mon + 1, stTime.tm_mday, stTime.tm_hour, stTime.tm_min, stTime.tm_sec
-		, g_EchoServer.GetSessionCount()
+		, g_EchoServer.GetCapacityPacketPool()
 		, g_EchoServer.GetUsePacketPool()
+		, g_EchoServer.GetSessionCount()
 		, g_EchoServer.GetTotalAcceptCount()
 		, g_EchoServer.GetAcceptTPS()
 		, g_EchoServer.GetRecvTPS()

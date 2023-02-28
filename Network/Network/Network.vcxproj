@@ -146,8 +146,8 @@
     <ClInclude Include="LFObjectPool.h" />
     <ClInclude Include="LFObjectPool_TLS.h" />
     <ClInclude Include="Lock.h" />
-    <ClInclude Include="LockFreeQueue.h" />
-    <ClInclude Include="LockFreeStack.h" />
+    <ClInclude Include="LFQueue.h" />
+    <ClInclude Include="LFStack.h" />
     <ClInclude Include="NetClient.h" />
     <ClInclude Include="NetException.h" />
     <ClInclude Include="NetContent.h" />

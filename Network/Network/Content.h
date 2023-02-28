@@ -1,7 +1,7 @@
 #ifndef __CONTENT__H
 #define __CONTENT__H
 #include "NetContent.h"
-#include "LockFreeQueue.h"
+#include "LFQueue.h"
 #include "List.h"
 
 enum CONTENT_JOB_TYPE
@@ -25,7 +25,7 @@ struct CONTENT
 	WORD frameInterval;
 	Jay::NetContent* handler;
 	Jay::List<DWORD64> sessionIDList;
-	Jay::LockFreeQueue<CONTENT_JOB*> jobQ;
+	Jay::LFQueue<CONTENT_JOB*> jobQ;
 };
 
 #endif

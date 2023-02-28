@@ -5,7 +5,7 @@
 namespace Jay
 {
     /**
-    * @file		LockFreeQueue.h
+    * @file		LFQueue.h
     * @brief	Lock-Free Queue Template Class
     * @details	CAS 연산으로 구현한 구현한 락프리 큐 클래스
     * @author	고재현
@@ -13,7 +13,7 @@ namespace Jay
     * @version	1.0.0
     **/
     template<typename T>
-    class LockFreeQueue
+    class LFQueue
     {
     private:
         struct NODE
@@ -22,13 +22,13 @@ namespace Jay
             NODE* next;
         };
     public:
-        LockFreeQueue() : _count(0), _nodePool(0, false)
+        LFQueue() : _count(0), _nodePool(0, false)
         {
             _head = _nodePool.Alloc();
             _head->next = nullptr;
             _tail = _head;
         }
-        ~LockFreeQueue()
+        ~LFQueue()
         {
             T temp;
             while (Dequeue(temp))

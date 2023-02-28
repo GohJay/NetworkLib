@@ -5,7 +5,7 @@
 namespace Jay
 {
     /**
-    * @file		LockFreeStack.h
+    * @file		LFStack.h
     * @brief	Lock-Free Stack Template Class
     * @details	CAS 연산으로 구현한 구현한 락프리 스택 클래스
     * @author	고재현
@@ -13,7 +13,7 @@ namespace Jay
     * @version	1.0.0
     **/
     template<typename T>
-    class LockFreeStack
+    class LFStack
     {
     private:
         struct NODE
@@ -22,10 +22,10 @@ namespace Jay
             NODE* prev;
         };
     public:
-        LockFreeStack() : _top(nullptr), _nodePool(0, false)
+        LFStack() : _top(nullptr), _nodePool(0, false)
         {
         }
-        ~LockFreeStack()
+        ~LFStack()
         {
             T temp;
             while (Pop(temp))
