@@ -16,7 +16,7 @@ struct MONITORING
 {
 	TPS oldTPS;
 	TPS curTPS;
-	LONGLONG acceptTotal;
+	LONG64 acceptTotal;
 };
 
 #endif

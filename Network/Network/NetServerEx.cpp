@@ -726,6 +726,7 @@ void NetServerEx::TimeoutProc()
 			//--------------------------------------------------------------------
 			// 타임아웃 처리
 			//--------------------------------------------------------------------
+			OnError(NET_ERROR_SESSION_TIMEOUT, __FUNCTIONW__, __LINE__, session->sessionID, currentTime - session->lastRecvTime);
 			DisconnectSession(session);
 		} while (0);
 

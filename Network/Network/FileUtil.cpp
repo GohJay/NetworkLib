@@ -93,39 +93,18 @@ bool Jay::Rename(const wchar_t* oldfile, const wchar_t* newfile, bool force)
 {
 	if (force && ExistFile(newfile))
 		_wremove(newfile);
+
 	return _wrename(oldfile, newfile) == 0;
 }
-bool Jay::GetModuleName(HANDLE hProcess, wchar_t* modulename)
+bool Jay::GetModuleName(HANDLE hProcess, wchar_t* modulename, int size)
 {
-	wchar_t modulepath[MAX_PATH];
-	wchar_t* filename;
+	wchar_t path[MAX_PATH];
 
-	if (GetModuleFileNameEx(hProcess, NULL, modulepath, MAX_PATH) == 0)
+	if (GetModuleFileNameEx(hProcess, NULL, path, MAX_PATH) == 0)
 		return false;
 
-	filename = Jay::FindFileName(modulepath);
-	Jay::RemoveFileEtc(filename);
+	if (_wsplitpath_s(path, NULL, 0, NULL, 0, modulename, size, NULL, 0) != 0)
+		return false;
 
-	wcscpy_s(modulename, wcslen(filename) * 2, filename);
 	return true;
-}
-wchar_t* Jay::FindFileName(wchar_t* filepath)
-{
-	for (int i = wcslen(filepath); i > 0; i--)
-	{
-		if (filepath[i] == '\\')
-			return &filepath[i] + 1;
-	}
-	return filepath;
-}
-void Jay::RemoveFileEtc(wchar_t* filepath)
-{
-	for (int i = wcslen(filepath); i > 0; i--)
-	{
-		if (filepath[i] == '.')
-		{
-			filepath[i] = '\0';
-			break;
-		}
-	}
 }
