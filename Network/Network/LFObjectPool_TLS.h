@@ -2,7 +2,7 @@
 #define  __LFOBJECT_POOL_TLS__H_
 #include "LFObjectPool.h"
 
-#define CHUNK_UNIT		300
+#define CHUNK_UNIT		400
 
 namespace Jay
 {

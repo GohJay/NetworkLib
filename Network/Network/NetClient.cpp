@@ -147,7 +147,7 @@ bool NetClient::Disconnect()
 	if (session != nullptr)
 	{
 		DisconnectSession(session);
-		CloseHandle(session);
+		CloseSession(session);
 		return true;
 	}
 	return false;

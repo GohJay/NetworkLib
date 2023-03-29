@@ -8,6 +8,7 @@
 #include <process.h>
 #include <ws2tcpip.h>
 #include <timeapi.h>
+#include <mstcpip.h>
 #pragma comment(lib, "ws2_32")
 
 using namespace Jay;
@@ -175,7 +176,7 @@ SESSION* NetServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 		OnError(NET_FATAL_INVALID_SIZE, __FUNCTIONW__, __LINE__, NULL, NULL);
 		return nullptr;
 	}
-
+	
 	//--------------------------------------------------------------------
 	// 세션 할당
 	//--------------------------------------------------------------------
@@ -640,6 +641,7 @@ void NetServer::TimeoutProc()
 
 	SESSION* session;
 	DWORD64 sessionID;
+	DWORD lastRecvTime;
 	for (int index = 0; index < _sessionMax; index++)
 	{
 		//--------------------------------------------------------------------
@@ -653,7 +655,8 @@ void NetServer::TimeoutProc()
 		// 타임아웃 여부 판단
 		//--------------------------------------------------------------------
 		sessionID = session->sessionID;
-		if (session->lastRecvTime > timeout)
+		lastRecvTime = session->lastRecvTime;
+		if (lastRecvTime > timeout)
 			continue;
 
 		IncrementIOCount(session);
@@ -675,7 +678,7 @@ void NetServer::TimeoutProc()
 			//--------------------------------------------------------------------
 			// 타임아웃 처리
 			//--------------------------------------------------------------------
-			OnError(NET_ERROR_SESSION_TIMEOUT, __FUNCTIONW__, __LINE__, session->sessionID, currentTime - session->lastRecvTime);
+			OnError(NET_ERROR_SESSION_TIMEOUT, __FUNCTIONW__, __LINE__, sessionID, currentTime - lastRecvTime);
 			DisconnectSession(session);
 		} while (0);
 
@@ -706,6 +709,19 @@ bool NetServer::Listen(const wchar_t* ipaddress, int port, bool nagle)
 	so_linger.l_onoff = 1;
 	so_linger.l_linger = 0;
 	int ret = setsockopt(_listenSocket, SOL_SOCKET, SO_LINGER, (char*)&so_linger, sizeof(so_linger));
+	if (ret == SOCKET_ERROR)
+	{
+		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+		closesocket(_listenSocket);
+		return false;
+	}
+
+	tcp_keepalive tcpkl;
+	tcpkl.onoff = 1;
+	tcpkl.keepalivetime = 1000 * 40;
+	tcpkl.keepaliveinterval = 500;
+	DWORD dwRet;
+	ret = WSAIoctl(_listenSocket, SIO_KEEPALIVE_VALS, &tcpkl, sizeof(tcpkl), 0, 0, &dwRet, NULL, NULL);
 	if (ret == SOCKET_ERROR)
 	{
 		OnError(NET_ERROR_LISTEN_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());

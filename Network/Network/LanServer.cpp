@@ -629,6 +629,7 @@ void LanServer::TimeoutProc()
 
 	SESSION* session;
 	DWORD64 sessionID;
+	DWORD lastRecvTime;
 	for (int index = 0; index < _sessionMax; index++)
 	{
 		//--------------------------------------------------------------------
@@ -642,7 +643,8 @@ void LanServer::TimeoutProc()
 		// 타임아웃 여부 판단
 		//--------------------------------------------------------------------
 		sessionID = session->sessionID;
-		if (session->lastRecvTime > timeout)
+		lastRecvTime = session->lastRecvTime;
+		if (lastRecvTime > timeout)
 			continue;
 
 		IncrementIOCount(session);
@@ -664,7 +666,7 @@ void LanServer::TimeoutProc()
 			//--------------------------------------------------------------------
 			// 타임아웃 처리
 			//--------------------------------------------------------------------
-			OnError(NET_ERROR_SESSION_TIMEOUT, __FUNCTIONW__, __LINE__, session->sessionID, currentTime - session->lastRecvTime);
+			OnError(NET_ERROR_SESSION_TIMEOUT, __FUNCTIONW__, __LINE__, sessionID, currentTime - lastRecvTime);
 			DisconnectSession(session);
 		} while (0);
 
