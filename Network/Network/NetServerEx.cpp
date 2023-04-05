@@ -94,24 +94,14 @@ bool NetServerEx::Start(const wchar_t* ipaddress, int port, int workerCreateCoun
 void NetServerEx::Stop()
 {
 	//--------------------------------------------------------------------
-	// AcceptThread, ManagementThread, ContentThread 종료 신호 보내기
+	// AcceptThread 종료 신호 보내기
 	//--------------------------------------------------------------------
 	closesocket(_listenSocket);
-	_stopSignal = true;
 
 	//--------------------------------------------------------------------
-	// AcceptThread, ManagementThread 종료 대기
+	// AcceptThread 종료 대기
 	//--------------------------------------------------------------------
-	HANDLE hHandle[2] = { _hAcceptThread, _hManagementThread };
-	DWORD ret;
-	ret = WaitForMultipleObjects(2, hHandle, TRUE, INFINITE);
-	if (ret == WAIT_FAILED)
-		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
-
-	//--------------------------------------------------------------------
-	// ContentThread 종료 대기
-	//--------------------------------------------------------------------
-	ret = WaitForMultipleObjects(_contentCount, _hContentThread, TRUE, INFINITE);
+	DWORD ret = WaitForSingleObject(_hAcceptThread, INFINITE);
 	if (ret == WAIT_FAILED)
 		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
 
@@ -141,6 +131,25 @@ void NetServerEx::Stop()
 	// WorkerThread 종료 대기
 	//--------------------------------------------------------------------
 	ret = WaitForMultipleObjects(_workerCreateCount, _hWorkerThread, TRUE, INFINITE);
+	if (ret == WAIT_FAILED)
+		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+
+	//--------------------------------------------------------------------
+	// ManagementThread, ContentThread 종료 신호 보내기
+	//--------------------------------------------------------------------
+	_stopSignal = true;
+
+	//--------------------------------------------------------------------
+	// ManagementThread 종료 대기
+	//--------------------------------------------------------------------
+	ret = WaitForSingleObject(_hManagementThread, INFINITE);
+	if (ret == WAIT_FAILED)
+		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
+
+	//--------------------------------------------------------------------
+	// ContentThread 종료 대기
+	//--------------------------------------------------------------------
+	ret = WaitForMultipleObjects(_contentCount, _hContentThread, TRUE, INFINITE);
 	if (ret == WAIT_FAILED)
 		OnError(NET_ERROR_RELEASE_FAILED, __FUNCTIONW__, __LINE__, NULL, WSAGetLastError());
 
@@ -1176,7 +1185,10 @@ unsigned int NetServerEx::ContentThread()
 	DWORD frameInterval;
 	DWORD deltatime;
 	DWORD aftertime;
-	DWORD beforetime = timeGetTime();
+	DWORD beforetime;
+
+	content->handler->OnStart();
+	beforetime = timeGetTime();
 
 	while (!_stopSignal)
 	{
@@ -1191,6 +1203,10 @@ unsigned int NetServerEx::ContentThread()
 			Sleep(frameInterval - deltatime);
 		beforetime += frameInterval;
 	}
+
+	// 마지막 컨텐츠 갱신
+	NotifyContent(content);
+	content->handler->OnStop();
 	return 0;
 }
 unsigned int __stdcall NetServerEx::WrapAcceptThread(LPVOID lpParam)
