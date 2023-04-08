@@ -16,8 +16,8 @@ namespace Jay
 		* @brief	Network NetServer Extension Class
 		* @details	외부 네트워크의 게임 클라이언트와 통신을 목적으로한 IOCP 서버 클래스
 		* @author	고재현
-		* @date		2023-02-26
-		* @version	1.0.2
+		* @date		2023-04-06
+		* @version	1.0.3
 		**/
 	public:
 		NetServerEx();

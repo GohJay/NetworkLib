@@ -82,10 +82,13 @@ bool NetServerEx::Start(const wchar_t* ipaddress, int port, int workerCreateCoun
 	//--------------------------------------------------------------------
 	// Thread Begin
 	//--------------------------------------------------------------------
-	for (int i = 0; i < _contentCount; i++)
-		_hContentThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapContentThread, this, 0, (unsigned int*)&_contentArray[i].threadID);
 	for (int i = 0; i < _workerCreateCount; i++)
 		_hWorkerThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapWorkerThread, this, 0, NULL);
+	for (int i = 0; i < _contentCount; i++)
+	{
+		_hContentThread[i] = (HANDLE)_beginthreadex(NULL, 0, WrapContentThread, this, CREATE_SUSPENDED, (unsigned int*)&_contentArray[i].threadID);
+		ResumeThread(_hContentThread[i]);
+	}
 	_hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, WrapAcceptThread, this, 0, NULL);
 	_hManagementThread = (HANDLE)_beginthreadex(NULL, 0, WrapManagementThread, this, 0, NULL);
 
