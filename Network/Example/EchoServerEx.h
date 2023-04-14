@@ -34,6 +34,8 @@ public:
 public:
 	int GetFPS();
 private:
+	void OnStart() override;
+	void OnStop() override;
 	void OnUpdate() override;
 	void OnClientJoin(DWORD64 sessionID) override;
 	void OnClientLeave(DWORD64 sessionID) override;
@@ -59,6 +61,8 @@ public:
 public:
 	int GetFPS();
 private:
+	void OnStart() override;
+	void OnStop() override;
 	void OnUpdate() override;
 	void OnClientJoin(DWORD64 sessionID) override;
 	void OnClientLeave(DWORD64 sessionID) override;

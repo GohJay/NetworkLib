@@ -266,7 +266,7 @@ void LanServer::IncrementIOCount(SESSION* session)
 void LanServer::CloseSession(SESSION* session)
 {
 	//--------------------------------------------------------------------
-	// IO Count 차감 값이 0일 경우 세션 릴리즈 요청
+	// IO Count 차감 값이 0일 경우 세션 릴리즈 처리
 	//--------------------------------------------------------------------
 	if (InterlockedDecrement16(&session->ioCount) == 0)
 		ReleaseSession(session);
@@ -531,7 +531,7 @@ void LanServer::CompleteSendPacket(SESSION* session)
 void LanServer::TrySendPacket(SESSION* session, NetPacket* packet)
 {
 	int size = session->sendQ.size();
-	if (size > MAX_SENDBUF)
+	if (size >= MAX_SENDBUF)
 	{
 		// 여유공간이 부족하여 메시지를 담을 수 없다는 것은 서버가 처리해줄 수 있는 한계를 지났다는 것. 연결을 끊는다.
 		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);

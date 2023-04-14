@@ -54,6 +54,12 @@ int LoginServerEx::GetFPS()
 {
 	return _oldFPS;
 }
+void LoginServerEx::OnStart()
+{
+}
+void LoginServerEx::OnStop()
+{
+}
 void LoginServerEx::OnUpdate()
 {
 	_curFPS++;
@@ -139,6 +145,12 @@ GameServerEx::~GameServerEx()
 int GameServerEx::GetFPS()
 {
 	return _oldFPS;
+}
+void GameServerEx::OnStart()
+{
+}
+void GameServerEx::OnStop()
+{
 }
 void GameServerEx::OnUpdate()
 {
