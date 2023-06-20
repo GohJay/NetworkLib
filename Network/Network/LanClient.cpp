@@ -180,7 +180,7 @@ void LanClient::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
 	//--------------------------------------------------------------------
-	if (InterlockedCompareExchange(&session->release, TRUE, FALSE) != FALSE)
+	if (InterlockedCompareExchange(&session->status, TRUE, FALSE) != FALSE)
 		return;
 
 	//--------------------------------------------------------------------

@@ -23,7 +23,7 @@ namespace Jay
 		NetServerEx();
 		virtual ~NetServerEx();
 	public:
-		void AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool default = false);
+		void AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool isDefault = false);
 		bool SetFrameInterval(WORD contentID, WORD frameInterval);
 		bool Start(const wchar_t* ipaddress, int port, int workerCreateCount, int workerRunningCount, WORD sessionMax, BYTE packetCode, BYTE packetKey, int timeoutSec = 0, bool nagle = true);
 		void Stop();

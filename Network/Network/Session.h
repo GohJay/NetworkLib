@@ -33,7 +33,7 @@ struct alignas(64) SESSION
 			SHORT releaseFlag;
 			SHORT ioCount;
 		};
-		LONG release;
+		LONG status;
 	};
 	OVERLAPPED recvOverlapped;
 	OVERLAPPED sendOverlapped;
@@ -50,7 +50,7 @@ struct alignas(64) SESSION
 	Jay::LFQueue<SESSION_JOB*> jobQ;
 
 	SESSION() {
-		release = TRUE;
+		status = TRUE;
 		sendBuf = (Jay::NetPacket**)malloc(sizeof(void*) * MAX_SENDBUF);
 	}
 	~SESSION() {

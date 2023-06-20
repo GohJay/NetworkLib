@@ -192,6 +192,11 @@ SESSION* NetServer::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 	session->sessionID = MAKE_SESSIONID(++_sessionKey, index);
 	session->releaseFlag = FALSE;
 
+	//--------------------------------------------------------------------
+	// 할당된 세션을 IOCP에 등록
+	//--------------------------------------------------------------------
+	CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
+
 	InterlockedIncrement16((SHORT*)&_sessionCount);
 	return session;
 }
@@ -200,7 +205,7 @@ void NetServer::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
 	//--------------------------------------------------------------------
-	if (InterlockedCompareExchange(&session->release, TRUE, FALSE) != FALSE)
+	if (InterlockedCompareExchange(&session->status, TRUE, FALSE) != FALSE)
 		return;
 
 	//--------------------------------------------------------------------
@@ -856,11 +861,6 @@ unsigned int NetServer::AcceptThread()
 			closesocket(socket);
 			continue;
 		}
-
-		//--------------------------------------------------------------------
-		// 할당된 세션을 IOCP에 등록
-		//--------------------------------------------------------------------
-		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
 		// 신규 접속자의 정보를 컨텐츠 부에 알리고 수신 등록

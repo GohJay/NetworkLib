@@ -26,7 +26,7 @@ NetServerEx::~NetServerEx()
 {
 	WSACleanup();
 }
-void NetServerEx::AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool default)
+void NetServerEx::AttachContent(NetContent* handler, WORD contentID, WORD frameInterval, bool isDefault)
 {
 	if (_contentCount >= MAX_CONTENT)
 	{
@@ -40,7 +40,7 @@ void NetServerEx::AttachContent(NetContent* handler, WORD contentID, WORD frameI
 	content->contentID = contentID;
 	content->frameInterval = frameInterval;
 
-	if (default)
+	if (isDefault)
 		_defaultContentIndex = index;
 }
 bool NetServerEx::SetFrameInterval(WORD contentID, WORD frameInterval)
@@ -250,6 +250,11 @@ SESSION* NetServerEx::CreateSession(SOCKET socket, SOCKADDR_IN* socketAddr)
 	session->sessionID = MAKE_SESSIONID(++_sessionKey, index);
 	session->releaseFlag = FALSE;
 
+	//--------------------------------------------------------------------
+	// 할당된 세션을 IOCP에 등록
+	//--------------------------------------------------------------------
+	CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
+
 	InterlockedIncrement16((SHORT*)&_sessionCount);
 	return session;
 }
@@ -258,7 +263,7 @@ void NetServerEx::ReleaseSession(SESSION* session)
 	//--------------------------------------------------------------------
 	// 세션의 IOCount, releaseFlag 가 모두 0 인지 확인
 	//--------------------------------------------------------------------
-	if (InterlockedCompareExchange(&session->release, TRUE, FALSE) != FALSE)
+	if (InterlockedCompareExchange(&session->status, TRUE, FALSE) != FALSE)
 		return;
 
 	//--------------------------------------------------------------------
@@ -564,6 +569,17 @@ int NetServerEx::CompleteRecvPacket(SESSION* session)
 	}
 
 	//--------------------------------------------------------------------
+	// 여유공간이 없다는 것은 파싱 할 수 없는 오류가 있는 것. 연결을 끊는다.
+	//--------------------------------------------------------------------
+	size = session->jobQ.size();
+	if (size >= MAX_RECVBUF)
+	{
+		OnError(NET_ERROR_NETBUFFER_OVER, __FUNCTIONW__, __LINE__, session->sessionID, size);
+		NetPacket::Free(packet);
+		return -1;
+	}
+
+	//--------------------------------------------------------------------
 	// 오브젝트 풀에서 세션 Job 할당
 	//--------------------------------------------------------------------
 	SESSION_JOB* sessionJob = _sessionJobPool.Alloc();
@@ -618,9 +634,10 @@ void NetServerEx::TrySendPacket(SESSION* session, NetPacket* packet)
 	session->sendQ.Enqueue(packet);
 
 	//--------------------------------------------------------------------
-	// 송신 처리
+	// 송신 요청
 	//--------------------------------------------------------------------
-	SendPost(session);
+	IncrementIOCount(session);
+	QueueUserMessage(UM_POST_SEND_PACKET, (LPVOID)session);
 }
 void NetServerEx::ClearSendPacket(SESSION* session)
 {
@@ -1093,11 +1110,6 @@ unsigned int NetServerEx::AcceptThread()
 			closesocket(socket);
 			continue;
 		}
-
-		//--------------------------------------------------------------------
-		// 할당된 세션을 IOCP에 등록
-		//--------------------------------------------------------------------
-		CreateIoCompletionPort((HANDLE)session->socket, _hCompletionPort, (ULONG_PTR)session, NULL);
 
 		//--------------------------------------------------------------------
 		// Default 컨텐츠에 신규 접속 정보 Job 큐잉
